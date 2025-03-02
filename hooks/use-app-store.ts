@@ -7,13 +7,16 @@ import { posts, comments } from '@/mocks/posts';
 
 interface AppState {
   users: User[];
-  currentUser: User;
+  currentUser: User | null;
   posts: Post[];
   comments: Comment[];
   likedPosts: string[];
   retweetedPosts: string[];
+  isLoggedIn: boolean;
   
   // Actions
+  login: (email: string) => User | null;
+  logout: () => void;
   likePost: (postId: string) => void;
   unlikePost: (postId: string) => void;
   retweetPost: (postId: string) => void;
@@ -23,7 +26,7 @@ interface AppState {
   getUserById: (userId: string) => User | undefined;
   getPostsByUserId: (userId: string) => Post[];
   getCommentsForPost: (postId: string) => Comment[];
-  getFriendsPosts: () => Post[]; // Method to get only friends' posts
+  getFriendsPosts: () => Post[];
   followUser: (userId: string) => void;
   unfollowUser: (userId: string) => void;
   updateProfilePicture: (imageUri: string) => void;
@@ -33,11 +36,25 @@ export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       users,
-      currentUser,
+      currentUser: null,
       posts,
       comments,
       likedPosts: [],
       retweetedPosts: [],
+      isLoggedIn: false,
+
+      login: (email: string) => {
+        const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+        if (user) {
+          set({ currentUser: user, isLoggedIn: true });
+          return user;
+        }
+        return null;
+      },
+
+      logout: () => {
+        set({ currentUser: null, isLoggedIn: false });
+      },
 
       likePost: (postId: string) => {
         set((state) => {
@@ -92,7 +109,7 @@ export const useAppStore = create<AppState>()(
           const newComment: Comment = {
             id: `comment-${Date.now()}`,
             postId,
-            userId: state.currentUser.id,
+            userId: state.currentUser?.id || '',
             text,
             date: new Date().toISOString(),
             likes: 0
@@ -113,7 +130,7 @@ export const useAppStore = create<AppState>()(
         set((state) => {
           const newPost: Post = {
             id: `post-${Date.now()}`,
-            userId: state.currentUser.id,
+            userId: state.currentUser?.id || '',
             text,
             images,
             course,
@@ -145,18 +162,18 @@ export const useAppStore = create<AppState>()(
 
       getFriendsPosts: () => {
         const { currentUser, posts } = get();
-        const friendIds = currentUser.friends || [];
+        const friendIds = currentUser?.friends || [];
         
         // Include current user's posts and friends' posts
         return posts.filter(post => 
-          post.userId === currentUser.id || friendIds.includes(post.userId)
+          post.userId === currentUser?.id || friendIds.includes(post.userId)
         ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       },
 
       followUser: (userId: string) => {
         set((state) => {
           // Add user to current user's friends list
-          const updatedFriends = [...(state.currentUser.friends || [])];
+          const updatedFriends = [...(state.currentUser?.friends || [])];
           if (!updatedFriends.includes(userId)) {
             updatedFriends.push(userId);
           }
@@ -172,7 +189,7 @@ export const useAppStore = create<AppState>()(
           const updatedCurrentUser = {
             ...state.currentUser,
             friends: updatedFriends,
-            following: state.currentUser.following + 1
+            following: state.currentUser?.following + 1
           };
           
           return {
@@ -185,7 +202,7 @@ export const useAppStore = create<AppState>()(
       unfollowUser: (userId: string) => {
         set((state) => {
           // Remove user from current user's friends list
-          const updatedFriends = (state.currentUser.friends || []).filter(id => id !== userId);
+          const updatedFriends = (state.currentUser?.friends || []).filter(id => id !== userId);
           
           // Update the user's followers count
           const updatedUsers = state.users.map(user => 
@@ -198,7 +215,7 @@ export const useAppStore = create<AppState>()(
           const updatedCurrentUser = {
             ...state.currentUser,
             friends: updatedFriends,
-            following: Math.max(0, state.currentUser.following - 1)
+            following: Math.max(0, state.currentUser?.following - 1)
           };
           
           return {
@@ -218,7 +235,7 @@ export const useAppStore = create<AppState>()(
           
           // Also update the user in the users array
           const updatedUsers = state.users.map(user => 
-            user.id === state.currentUser.id 
+            user.id === state.currentUser?.id 
               ? { ...user, avatar: imageUri }
               : user
           );
