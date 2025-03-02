@@ -131,6 +131,20 @@ export const users: User[] = [
     favoriteCourse: 'TPC Harding Park',
     location: 'Las Vegas, NV',
     joinedDate: '2019-06-20',
+  },
+  {
+    id: '11',
+    name: 'Harrison Mc.',
+    username: 'harrisonmc',
+    avatar: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80',
+    bio: 'Golf enthusiast and amateur player. Love spending weekends on the course.',
+    following: 145,
+    followers: 2500,
+    handicap: 15,
+    favoriteCourse: 'St. Andrews',
+    location: 'Orlando, FL',
+    joinedDate: '2024-03-02',
+    friends: ['7'] // Friends with Rob Mc
   }
 ];
 
