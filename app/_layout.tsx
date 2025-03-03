@@ -6,6 +6,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
 import { AuthGuard } from '@/components/auth-guard';
+import { colors } from '@/constants/colors';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -55,6 +56,16 @@ function RootLayoutNav() {
         <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: true }} />
         <Stack.Screen name="post/[id]" />
         <Stack.Screen name="profile/[id]" />
+        <Stack.Screen
+          name="course-details"
+          options={{
+            title: 'Course Details',
+            headerStyle: {
+              backgroundColor: colors.background,
+            },
+            headerTintColor: colors.text,
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );

@@ -5,6 +5,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
 import * as Location from 'expo-location';
 import { GolfCoursesMap } from '@/components/golf-courses-map';
+import { RootStackParamList } from '@/types/navigation';
 
 interface GolfCourse {
   id: string;
@@ -273,7 +274,7 @@ export default function GolfCoursesScreen() {
 
   const handleCoursePress = (course: GolfCourse) => {
     router.push({
-      pathname: '/course-details',
+      pathname: '/course-details' as const,
       params: {
         id: course.id,
         name: course.name,
