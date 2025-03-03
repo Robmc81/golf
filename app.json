@@ -17,14 +17,21 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.robmc81.expoapp",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "We need your location to show you nearby golf courses.",
+        "NSLocationAlwaysUsageDescription": "We need your location to show you nearby golf courses."
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.robmc81.expoapp",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "plugins": [
       "expo-router"

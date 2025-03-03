@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, Image, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, Image, Dimensions, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
+import * as Location from 'expo-location';
 
 interface GolfCourse {
   id: string;
@@ -12,6 +13,11 @@ interface GolfCourse {
   price: string;
   image: any; // Using require for local images
   description: string;
+  distance?: number;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 // Mock data for Atlanta golf courses with local images
@@ -23,7 +29,11 @@ const golfCourses: GolfCourse[] = [
     rating: 4.8,
     price: '$$$',
     image: require('@/assets/images/golf-courses/east-lake.jpg'),
-    description: 'Historic course that hosts the TOUR Championship'
+    description: 'Historic course that hosts the TOUR Championship',
+    coordinates: {
+      latitude: 33.7407,
+      longitude: -84.3077
+    }
   },
   {
     id: '2',
@@ -32,7 +42,11 @@ const golfCourses: GolfCourse[] = [
     rating: 4.7,
     price: '$$$',
     image: require('@/assets/images/golf-courses/atlanta-athletic.jpg'),
-    description: 'Prestigious private club with two championship courses'
+    description: 'Prestigious private club with two championship courses',
+    coordinates: {
+      latitude: 34.0289,
+      longitude: -84.1987
+    }
   },
   {
     id: '3',
@@ -41,7 +55,11 @@ const golfCourses: GolfCourse[] = [
     rating: 4.2,
     price: '$',
     image: require('@/assets/images/golf-courses/bobby-jones.jpg'),
-    description: 'Historic public course recently renovated'
+    description: 'Historic public course recently renovated',
+    coordinates: {
+      latitude: 33.8017,
+      longitude: -84.3889
+    }
   },
   {
     id: '4',
@@ -50,7 +68,11 @@ const golfCourses: GolfCourse[] = [
     rating: 4.6,
     price: '$$',
     image: require('@/assets/images/golf-courses/tpc-sugarloaf.jpg'),
-    description: 'Championship course designed by Greg Norman'
+    description: 'Championship course designed by Greg Norman',
+    coordinates: {
+      latitude: 34.0029,
+      longitude: -84.1444
+    }
   },
   {
     id: '5',
@@ -59,7 +81,11 @@ const golfCourses: GolfCourse[] = [
     rating: 3.8,
     price: '$',
     image: require('@/assets/images/golf-courses/chastain-park.jpg'),
-    description: 'Popular public course in the heart of Buckhead'
+    description: 'Popular public course in the heart of Buckhead',
+    coordinates: {
+      latitude: 33.8757,
+      longitude: -84.3797
+    }
   }
 ];
 
@@ -69,11 +95,80 @@ const CARD_WIDTH = width - 32; // 16px padding on each side
 export default function GolfCoursesScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [nearbyCourses, setNearbyCourses] = useState<GolfCourse[]>([]);
 
-  const filteredCourses = golfCourses.filter(course => 
-    course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    course.location.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setError('Permission to access location was denied');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const location = await Location.getCurrentPositionAsync({});
+        setLocation(location);
+        
+        // Calculate distances and sort courses
+        const coursesWithDistance = golfCourses.map(course => {
+          if (!course.coordinates) return course;
+          
+          const distance = calculateDistance(
+            location.coords.latitude,
+            location.coords.longitude,
+            course.coordinates.latitude,
+            course.coordinates.longitude
+          );
+          
+          return {
+            ...course,
+            distance
+          };
+        }).sort((a, b) => (a.distance || 0) - (b.distance || 0));
+        
+        setNearbyCourses(coursesWithDistance);
+      } catch (err) {
+        setError('Error getting location');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Earth's radius in km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  const toRad = (value: number): number => {
+    return value * Math.PI / 180;
+  };
+
+  const formatDistance = (distance: number): string => {
+    if (distance < 1) {
+      return `${Math.round(distance * 1000)}m`;
+    }
+    return `${Math.round(distance * 10) / 10}km`;
+  };
+
+  const filteredCourses = searchQuery
+    ? golfCourses.filter(course => 
+        course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        course.location.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : nearbyCourses;
 
   const renderCourseItem = ({ item }: { item: GolfCourse }) => (
     <TouchableOpacity 
@@ -91,6 +186,12 @@ export default function GolfCoursesScreen() {
       <View style={styles.courseInfo}>
         <Text style={styles.courseName}>{item.name}</Text>
         <Text style={styles.courseLocation}>{item.location}</Text>
+        {item.distance && (
+          <View style={styles.distanceContainer}>
+            <FontAwesome name="map-marker" size={14} color={colors.textSecondary} />
+            <Text style={styles.distance}>{formatDistance(item.distance)} away</Text>
+          </View>
+        )}
         <Text style={styles.courseDescription}>{item.description}</Text>
         <View style={styles.courseDetails}>
           <View style={styles.ratingContainer}>
@@ -121,13 +222,24 @@ export default function GolfCoursesScreen() {
         ) : null}
       </View>
 
-      <FlatList
-        data={filteredCourses}
-        renderItem={renderCourseItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Finding courses near you...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredCourses}
+          renderItem={renderCourseItem}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 }
@@ -180,7 +292,17 @@ const styles = StyleSheet.create({
   courseLocation: {
     fontSize: 14,
     color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  distanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 8,
+  },
+  distance: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginLeft: 4,
   },
   courseDescription: {
     fontSize: 14,
@@ -205,5 +327,26 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    color: colors.error,
+    textAlign: 'center',
   },
 }); 
