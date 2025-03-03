@@ -1,11 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { FontAwesome, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
 import MapView, { Marker } from 'react-native-maps';
-
-const { width } = Dimensions.get('window');
 
 export default function CourseDetailsScreen() {
   const router = useRouter();
@@ -50,19 +48,26 @@ export default function CourseDetailsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Image 
-        source={{ uri: params.image as string }} 
-        style={styles.image}
-      />
-      
-      <View style={styles.content}>
-        <Text style={styles.name}>{params.name}</Text>
-        <View style={styles.locationContainer}>
-          <Ionicons name="location" size={16} color="#666" />
-          <Text style={styles.location}>{params.location}</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="chevron-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>{params.name}</Text>
+          <Text style={styles.courseName}>{params.location}</Text>
         </View>
+      </View>
 
+      <ScrollView style={styles.content}>
+        <Image 
+          source={{ uri: params.image as string }} 
+          style={styles.image}
+        />
+        
         <View style={styles.infoContainer}>
           <View style={styles.infoItem}>
             <Ionicons name="star" size={20} color="#FFD700" />
@@ -104,27 +109,27 @@ export default function CourseDetailsScreen() {
             <Text style={[styles.buttonText, styles.statsButtonText]}>Course Stats</Text>
           </TouchableOpacity>
         </View>
-      </View>
 
-      {coordinates && (
-        <View style={styles.mapContainer}>
-          <MapView
-            style={styles.map}
-            initialRegion={{
-              ...coordinates,
-              latitudeDelta: 0.0922,
-              longitudeDelta: 0.0421,
-            }}
-            scrollEnabled={false}
-          >
-            <Marker
-              coordinate={coordinates}
-              title={params.name}
-            />
-          </MapView>
-        </View>
-      )}
-    </ScrollView>
+        {coordinates && (
+          <View style={styles.mapContainer}>
+            <MapView
+              style={styles.map}
+              initialRegion={{
+                ...coordinates,
+                latitudeDelta: 0.0922,
+                longitudeDelta: 0.0421,
+              }}
+              scrollEnabled={false}
+            >
+              <Marker
+                coordinate={coordinates}
+                title={params.name}
+              />
+            </MapView>
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -133,34 +138,43 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  image: {
-    width: width,
-    height: 250,
-  },
-  content: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  name: {
-    fontSize: 24,
+  backButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 4,
   },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  location: {
+  courseName: {
     fontSize: 16,
     color: colors.textSecondary,
-    marginLeft: 4,
+  },
+  content: {
+    flex: 1,
+  },
+  image: {
+    width: '100%',
+    height: 250,
   },
   infoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 16,
     paddingVertical: 12,
+    paddingHorizontal: 16,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: colors.border,
@@ -178,6 +192,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+    paddingHorizontal: 16,
   },
   typeLabel: {
     fontSize: 16,
@@ -193,8 +208,10 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 24,
     marginBottom: 24,
+    paddingHorizontal: 16,
   },
   buttonContainer: {
+    padding: 16,
     gap: 12,
   },
   button: {
@@ -224,6 +241,7 @@ const styles = StyleSheet.create({
   mapContainer: {
     height: 200,
     width: '100%',
+    marginTop: 16,
   },
   map: {
     flex: 1,
