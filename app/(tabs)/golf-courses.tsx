@@ -97,16 +97,6 @@ export default function GolfCoursesScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <FontAwesome name="arrow-left" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Golf Courses</Text>
-      </View>
-
       <View style={styles.searchContainer}>
         <FontAwesome name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
         <TextInput
@@ -138,21 +128,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    marginRight: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
   },
   searchContainer: {
     flexDirection: 'row',
