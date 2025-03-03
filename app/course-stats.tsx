@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -36,86 +36,90 @@ export default function CourseStatsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="chevron-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.title}>Course Statistics</Text>
-        <Text style={styles.courseName}>{params.courseName}</Text>
-      </View>
-
-      <View style={styles.timeRangeContainer}>
-        <TouchableOpacity 
-          style={[styles.timeRangeButton, timeRange === 'week' && styles.activeTimeRange]}
-          onPress={() => setTimeRange('week')}
-        >
-          <Text style={[styles.timeRangeText, timeRange === 'week' && styles.activeTimeRangeText]}>Week</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.timeRangeButton, timeRange === 'month' && styles.activeTimeRange]}
-          onPress={() => setTimeRange('month')}
-        >
-          <Text style={[styles.timeRangeText, timeRange === 'month' && styles.activeTimeRangeText]}>Month</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.timeRangeButton, timeRange === 'year' && styles.activeTimeRange]}
-          onPress={() => setTimeRange('year')}
-        >
-          <Text style={[styles.timeRangeText, timeRange === 'year' && styles.activeTimeRangeText]}>Year</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{mockStats.averageScore}</Text>
-          <Text style={styles.statLabel}>Avg Score</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{mockStats.bestScore}</Text>
-          <Text style={styles.statLabel}>Best Score</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{mockStats.roundsPlayed}</Text>
-          <Text style={styles.statLabel}>Rounds</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{mockStats.averagePutts}</Text>
-          <Text style={styles.statLabel}>Avg Putts</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>Course Statistics</Text>
+          <Text style={styles.courseName}>{params.courseName}</Text>
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Rounds</Text>
-        {mockStats.recentRounds.map((round, index) => (
-          <View key={index} style={styles.roundRow}>
-            <Text style={styles.roundDate}>{formatDate(round.date)}</Text>
-            <View style={styles.roundStats}>
-              <Text style={styles.roundScore}>Score: {round.score}</Text>
-              <Text style={styles.roundDetail}>Putts: {round.putts}</Text>
-              <Text style={styles.roundDetail}>GIR: {round.gir}%</Text>
-              <Text style={styles.roundDetail}>Fairways: {round.fairways}%</Text>
-            </View>
+      <ScrollView style={styles.content}>
+        <View style={styles.timeRangeContainer}>
+          <TouchableOpacity 
+            style={[styles.timeRangeButton, timeRange === 'week' && styles.activeTimeRange]}
+            onPress={() => setTimeRange('week')}
+          >
+            <Text style={[styles.timeRangeText, timeRange === 'week' && styles.activeTimeRangeText]}>Week</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.timeRangeButton, timeRange === 'month' && styles.activeTimeRange]}
+            onPress={() => setTimeRange('month')}
+          >
+            <Text style={[styles.timeRangeText, timeRange === 'month' && styles.activeTimeRangeText]}>Month</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.timeRangeButton, timeRange === 'year' && styles.activeTimeRange]}
+            onPress={() => setTimeRange('year')}
+          >
+            <Text style={[styles.timeRangeText, timeRange === 'year' && styles.activeTimeRangeText]}>Year</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{mockStats.averageScore}</Text>
+            <Text style={styles.statLabel}>Avg Score</Text>
           </View>
-        ))}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Friends' Performance</Text>
-        {mockStats.friendsStats.map((friend, index) => (
-          <View key={index} style={styles.friendRow}>
-            <Text style={styles.friendName}>{friend.name}</Text>
-            <View style={styles.friendStats}>
-              <Text style={styles.friendStat}>Avg: {friend.averageScore}</Text>
-              <Text style={styles.friendStat}>Rounds: {friend.roundsPlayed}</Text>
-            </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{mockStats.bestScore}</Text>
+            <Text style={styles.statLabel}>Best Score</Text>
           </View>
-        ))}
-      </View>
-    </ScrollView>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{mockStats.roundsPlayed}</Text>
+            <Text style={styles.statLabel}>Rounds</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{mockStats.averagePutts}</Text>
+            <Text style={styles.statLabel}>Avg Putts</Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Rounds</Text>
+          {mockStats.recentRounds.map((round, index) => (
+            <View key={index} style={styles.roundRow}>
+              <Text style={styles.roundDate}>{formatDate(round.date)}</Text>
+              <View style={styles.roundStats}>
+                <Text style={styles.roundScore}>Score: {round.score}</Text>
+                <Text style={styles.roundDetail}>Putts: {round.putts}</Text>
+                <Text style={styles.roundDetail}>GIR: {round.gir}%</Text>
+                <Text style={styles.roundDetail}>Fairways: {round.fairways}%</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Friends' Performance</Text>
+          {mockStats.friendsStats.map((friend, index) => (
+            <View key={index} style={styles.friendRow}>
+              <Text style={styles.friendName}>{friend.name}</Text>
+              <View style={styles.friendStats}>
+                <Text style={styles.friendStat}>Avg: {friend.averageScore}</Text>
+                <Text style={styles.friendStat}>Rounds: {friend.roundsPlayed}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -125,21 +129,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
   backButton: {
-    marginBottom: 8,
+    padding: 8,
+    marginRight: 8,
+  },
+  headerContent: {
+    flex: 1,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   courseName: {
     fontSize: 16,
     color: '#666',
+  },
+  content: {
+    flex: 1,
   },
   timeRangeContainer: {
     flexDirection: 'row',
