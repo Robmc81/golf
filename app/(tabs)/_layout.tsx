@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, User, Bell, Search, PenSquare, Users } from 'lucide-react-native';
+import { Home, User, Bell, Search, PenSquare, Users, Flag } from 'lucide-react-native';
 import { colors } from '@/constants/colors';
 
 export default function TabLayout() {
@@ -42,6 +42,13 @@ export default function TabLayout() {
           title: 'Post',
           tabBarIcon: ({ color }) => <PenSquare size={24} color={color} />,
           headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="golf-courses"
+        options={{
+          title: 'Play',
+          tabBarIcon: ({ color }) => <Flag size={24} color={color} />,
         }}
       />
       <Tabs.Screen
