@@ -101,46 +101,104 @@ export default function GolfCoursesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [nearbyCourses, setNearbyCourses] = useState<GolfCourse[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [permissionDenied, setPermissionDenied] = useState(false);
+
+  const requestLocationPermission = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setPermissionDenied(true);
+        setError('Location permission is required to show nearby courses. Please enable it in your device settings.');
+        return false;
+      }
+      return true;
+    } catch (err) {
+      setError('Unable to request location permission. Please check your device settings.');
+      return false;
+    }
+  };
+
+  const getCurrentLocation = async () => {
+    try {
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      setLocation(location);
+      return true;
+    } catch (err) {
+      setError('Unable to get your current location. Please check your device settings and try again.');
+      return false;
+    }
+  };
+
+  const updateNearbyCourses = (userLocation: Location.LocationObject) => {
+    const coursesWithDistance = golfCourses.map(course => {
+      if (!course.coordinates) return course;
+      
+      const distance = calculateDistance(
+        userLocation.coords.latitude,
+        userLocation.coords.longitude,
+        course.coordinates.latitude,
+        course.coordinates.longitude
+      );
+      
+      return {
+        ...course,
+        distance
+      };
+    }).sort((a, b) => (a.distance || 0) - (b.distance || 0));
+    
+    setNearbyCourses(coursesWithDistance);
+  };
 
   useEffect(() => {
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setError('Permission to access location was denied');
+      setLoading(true);
+      setError(null);
+      
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
+        setLoading(false);
         return;
       }
 
-      try {
-        setLoading(true);
-        const location = await Location.getCurrentPositionAsync({});
-        setLocation(location);
-        
-        // Calculate distances and sort courses
-        const coursesWithDistance = golfCourses.map(course => {
-          if (!course.coordinates) return course;
-          
-          const distance = calculateDistance(
-            location.coords.latitude,
-            location.coords.longitude,
-            course.coordinates.latitude,
-            course.coordinates.longitude
-          );
-          
-          return {
-            ...course,
-            distance
-          };
-        }).sort((a, b) => (a.distance || 0) - (b.distance || 0));
-        
-        setNearbyCourses(coursesWithDistance);
-      } catch (err) {
-        setError('Error getting location');
-        console.error(err);
-      } finally {
+      const locationSuccess = await getCurrentLocation();
+      if (!locationSuccess) {
         setLoading(false);
+        return;
       }
+
+      if (location) {
+        updateNearbyCourses(location);
+      }
+      
+      setLoading(false);
     })();
   }, []);
+
+  const handleRetryLocation = async () => {
+    setLoading(true);
+    setError(null);
+    setPermissionDenied(false);
+    
+    const hasPermission = await requestLocationPermission();
+    if (!hasPermission) {
+      setLoading(false);
+      return;
+    }
+
+    const locationSuccess = await getCurrentLocation();
+    if (!locationSuccess) {
+      setLoading(false);
+      return;
+    }
+
+    if (location) {
+      updateNearbyCourses(location);
+    }
+    
+    setLoading(false);
+  };
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371; // Earth's radius in km
@@ -166,18 +224,25 @@ export default function GolfCoursesScreen() {
   };
 
   const filteredCourses = searchQuery
-    ? golfCourses.filter(course => 
-        course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        course.location.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? golfCourses.filter(course => {
+        const searchTerms = searchQuery.toLowerCase().split(' ');
+        const courseName = course.name.toLowerCase();
+        const courseLocation = course.location.toLowerCase();
+        const courseDescription = course.description.toLowerCase();
+        
+        return searchTerms.every(term => 
+          courseName.includes(term) ||
+          courseLocation.includes(term) ||
+          courseDescription.includes(term)
+        );
+      })
     : nearbyCourses;
 
   const renderCourseItem = ({ item }: { item: GolfCourse }) => (
     <TouchableOpacity 
       style={styles.courseCard}
       onPress={() => {
-        // Navigate to course details (to be implemented)
-        console.log('Selected course:', item.name);
+        handleCoursePress(item);
       }}
     >
       <Image 
@@ -207,8 +272,20 @@ export default function GolfCoursesScreen() {
   );
 
   const handleCoursePress = (course: GolfCourse) => {
-    // Navigate to course details (to be implemented)
-    console.log('Selected course:', course.name);
+    router.push({
+      pathname: '/course-details',
+      params: {
+        id: course.id,
+        name: course.name,
+        location: course.location,
+        rating: course.rating.toString(),
+        price: course.price,
+        description: course.description,
+        distance: course.distance?.toString(),
+        latitude: course.coordinates?.latitude.toString(),
+        longitude: course.coordinates?.longitude.toString(),
+      }
+    });
   };
 
   const renderContent = () => {
@@ -225,6 +302,12 @@ export default function GolfCoursesScreen() {
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={handleRetryLocation}
+          >
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -413,6 +496,19 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 16,
     color: colors.error,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
     textAlign: 'center',
   },
 }); 

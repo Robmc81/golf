@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, TouchableOpacity, Text } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker } from 'react-native-maps';
 import { FontAwesome } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
 
@@ -50,11 +50,11 @@ export const GolfCoursesMap: React.FC<GolfCoursesMapProps> = ({
   return (
     <View style={styles.container}>
       <MapView
-        provider={PROVIDER_GOOGLE}
         style={styles.map}
         initialRegion={initialRegion}
         showsUserLocation
         showsMyLocationButton
+        provider="google"
       >
         {userLocation && (
           <Marker

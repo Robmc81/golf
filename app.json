@@ -19,7 +19,11 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "We need your location to show you nearby golf courses.",
-        "NSLocationAlwaysUsageDescription": "We need your location to show you nearby golf courses."
+        "NSLocationAlwaysUsageDescription": "We need your location to show you nearby golf courses.",
+        "io.flutter.embedded_views_preview": true
+      },
+      "config": {
+        "googleMapsApiKey": "AIzaSyDNZCKTiWK2GXLIdrRfNJqvX9LacGgGp94"
       }
     },
     "android": {
@@ -31,7 +35,12 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
-      ]
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDNZCKTiWK2GXLIdrRfNJqvX9LacGgGp94"
+        }
+      }
     },
     "plugins": [
       "expo-router"
