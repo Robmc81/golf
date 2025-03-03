@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, Image, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
@@ -10,11 +10,11 @@ interface GolfCourse {
   location: string;
   rating: number;
   price: string;
-  image: string;
+  image: any; // Using require for local images
   description: string;
 }
 
-// Mock data for Atlanta golf courses
+// Mock data for Atlanta golf courses with local images
 const golfCourses: GolfCourse[] = [
   {
     id: '1',
@@ -22,7 +22,7 @@ const golfCourses: GolfCourse[] = [
     location: 'Atlanta, GA',
     rating: 4.8,
     price: '$$$',
-    image: 'https://example.com/eastlake.jpg',
+    image: require('@/assets/images/golf-courses/east-lake.jpg'),
     description: 'Historic course that hosts the TOUR Championship'
   },
   {
@@ -31,7 +31,7 @@ const golfCourses: GolfCourse[] = [
     location: 'Johns Creek, GA',
     rating: 4.7,
     price: '$$$',
-    image: 'https://example.com/aac.jpg',
+    image: require('@/assets/images/golf-courses/atlanta-athletic.jpg'),
     description: 'Prestigious private club with two championship courses'
   },
   {
@@ -40,7 +40,7 @@ const golfCourses: GolfCourse[] = [
     location: 'Atlanta, GA',
     rating: 4.2,
     price: '$',
-    image: 'https://example.com/bobbyjones.jpg',
+    image: require('@/assets/images/golf-courses/bobby-jones.jpg'),
     description: 'Historic public course recently renovated'
   },
   {
@@ -49,7 +49,7 @@ const golfCourses: GolfCourse[] = [
     location: 'Duluth, GA',
     rating: 4.6,
     price: '$$',
-    image: 'https://example.com/sugarloaf.jpg',
+    image: require('@/assets/images/golf-courses/tpc-sugarloaf.jpg'),
     description: 'Championship course designed by Greg Norman'
   },
   {
@@ -58,10 +58,13 @@ const golfCourses: GolfCourse[] = [
     location: 'Atlanta, GA',
     rating: 3.8,
     price: '$',
-    image: 'https://example.com/chastain.jpg',
+    image: require('@/assets/images/golf-courses/chastain-park.jpg'),
     description: 'Popular public course in the heart of Buckhead'
   }
 ];
+
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = width - 32; // 16px padding on each side
 
 export default function GolfCoursesScreen() {
   const router = useRouter();
@@ -80,6 +83,11 @@ export default function GolfCoursesScreen() {
         console.log('Selected course:', item.name);
       }}
     >
+      <Image 
+        source={item.image} 
+        style={styles.courseImage}
+        resizeMode="cover"
+      />
       <View style={styles.courseInfo}>
         <Text style={styles.courseName}>{item.name}</Text>
         <Text style={styles.courseLocation}>{item.location}</Text>
@@ -152,14 +160,19 @@ const styles = StyleSheet.create({
   courseCard: {
     backgroundColor: colors.card,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+    width: CARD_WIDTH,
+  },
+  courseImage: {
+    width: CARD_WIDTH,
+    height: 200,
   },
   courseInfo: {
-    flex: 1,
+    padding: 16,
   },
   courseName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 4,
@@ -172,7 +185,8 @@ const styles = StyleSheet.create({
   courseDescription: {
     fontSize: 14,
     color: colors.text,
-    marginBottom: 8,
+    marginBottom: 12,
+    lineHeight: 20,
   },
   courseDetails: {
     flexDirection: 'row',
