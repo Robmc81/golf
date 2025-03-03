@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
 import * as Location from 'expo-location';
+import { GolfCoursesMap } from '@/components/golf-courses-map';
 
 interface GolfCourse {
   id: string;
@@ -99,6 +100,7 @@ export default function GolfCoursesScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nearbyCourses, setNearbyCourses] = useState<GolfCourse[]>([]);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
   useEffect(() => {
     (async () => {
@@ -204,42 +206,85 @@ export default function GolfCoursesScreen() {
     </TouchableOpacity>
   );
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <FontAwesome name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search courses..."
-          placeholderTextColor={colors.textSecondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery ? (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <FontAwesome name="times-circle" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-        ) : null}
-      </View>
+  const handleCoursePress = (course: GolfCourse) => {
+    // Navigate to course details (to be implemented)
+    console.log('Selected course:', course.name);
+  };
 
-      {loading ? (
+  const renderContent = () => {
+    if (loading) {
+      return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Finding courses near you...</Text>
         </View>
-      ) : error ? (
+      );
+    }
+
+    if (error) {
+      return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
-      ) : (
-        <FlatList
-          data={filteredCourses}
-          renderItem={renderCourseItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
+      );
+    }
+
+    if (viewMode === 'map') {
+      return (
+        <GolfCoursesMap
+          courses={filteredCourses}
+          userLocation={location?.coords}
+          onCoursePress={handleCoursePress}
         />
-      )}
+      );
+    }
+
+    return (
+      <FlatList
+        data={filteredCourses}
+        renderItem={renderCourseItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+      />
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.searchContainer}>
+          <FontAwesome name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search courses..."
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <FontAwesome name="times-circle" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={styles.viewToggle}>
+          <TouchableOpacity
+            style={[styles.toggleButton, viewMode === 'list' && styles.activeToggle]}
+            onPress={() => setViewMode('list')}
+          >
+            <FontAwesome name="list" size={20} color={viewMode === 'list' ? colors.white : colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleButton, viewMode === 'map' && styles.activeToggle]}
+            onPress={() => setViewMode('map')}
+          >
+            <FontAwesome name="map" size={20} color={viewMode === 'map' ? colors.white : colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {renderContent()}
     </View>
   );
 }
@@ -249,14 +294,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  header: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
-    margin: 16,
     paddingHorizontal: 12,
     borderRadius: 8,
     height: 40,
+    marginBottom: 12,
   },
   searchIcon: {
     marginRight: 8,
@@ -265,6 +315,22 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: colors.text,
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  toggleButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  activeToggle: {
+    backgroundColor: colors.primary,
   },
   listContainer: {
     padding: 16,
