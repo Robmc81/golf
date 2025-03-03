@@ -132,26 +132,6 @@ export default function GolfCoursesScreen() {
     }
   };
 
-  const updateNearbyCourses = (userLocation: Location.LocationObject) => {
-    const coursesWithDistance = golfCourses.map(course => {
-      if (!course.coordinates) return course;
-      
-      const distance = calculateDistance(
-        userLocation.coords.latitude,
-        userLocation.coords.longitude,
-        course.coordinates.latitude,
-        course.coordinates.longitude
-      );
-      
-      return {
-        ...course,
-        distance
-      };
-    }).sort((a, b) => (a.distance || 0) - (b.distance || 0));
-    
-    setNearbyCourses(coursesWithDistance);
-  };
-
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -169,10 +149,31 @@ export default function GolfCoursesScreen() {
         return;
       }
 
-      if (location) {
-        updateNearbyCourses(location);
+      // Initialize with all courses if location is not available
+      if (!location) {
+        setNearbyCourses(golfCourses);
+        setLoading(false);
+        return;
       }
+
+      // Calculate distances and sort courses
+      const coursesWithDistance = golfCourses.map(course => {
+        if (!course.coordinates) return course;
+        
+        const distance = calculateDistance(
+          location.coords.latitude,
+          location.coords.longitude,
+          course.coordinates.latitude,
+          course.coordinates.longitude
+        );
+        
+        return {
+          ...course,
+          distance
+        };
+      }).sort((a, b) => (a.distance || 0) - (b.distance || 0));
       
+      setNearbyCourses(coursesWithDistance);
       setLoading(false);
     })();
   }, []);
@@ -194,10 +195,31 @@ export default function GolfCoursesScreen() {
       return;
     }
 
-    if (location) {
-      updateNearbyCourses(location);
+    // Initialize with all courses if location is not available
+    if (!location) {
+      setNearbyCourses(golfCourses);
+      setLoading(false);
+      return;
     }
+
+    // Calculate distances and sort courses
+    const coursesWithDistance = golfCourses.map(course => {
+      if (!course.coordinates) return course;
+      
+      const distance = calculateDistance(
+        location.coords.latitude,
+        location.coords.longitude,
+        course.coordinates.latitude,
+        course.coordinates.longitude
+      );
+      
+      return {
+        ...course,
+        distance
+      };
+    }).sort((a, b) => (a.distance || 0) - (b.distance || 0));
     
+    setNearbyCourses(coursesWithDistance);
     setLoading(false);
   };
 
