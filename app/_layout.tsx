@@ -55,6 +55,7 @@ function RootLayoutNav() {
         <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: true }} />
         <Stack.Screen name="post/[id]" />
         <Stack.Screen name="profile/[id]" />
+        <Stack.Screen name="golf-courses" />
       </Stack>
     </ThemeProvider>
   );

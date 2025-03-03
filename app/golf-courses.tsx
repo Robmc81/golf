@@ -1,6 +1,6 @@
-import { StatusBar } from "expo-status-bar";
-import { Platform, StyleSheet, Text, View, TouchableOpacity, FlatList, Image } from "react-native";
-import { useRouter } from "expo-router";
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput } from 'react-native';
+import { useRouter } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
 
@@ -63,8 +63,14 @@ const golfCourses: GolfCourse[] = [
   }
 ];
 
-export default function ModalScreen() {
+export default function GolfCoursesScreen() {
   const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredCourses = golfCourses.filter(course => 
+    course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    course.location.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const renderCourseItem = ({ item }: { item: GolfCourse }) => (
     <TouchableOpacity 
@@ -98,33 +104,32 @@ export default function ModalScreen() {
         >
           <FontAwesome name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Options</Text>
+        <Text style={styles.title}>Golf Courses</Text>
       </View>
 
-      <View style={styles.content}>
-        <TouchableOpacity 
-          style={styles.playButton}
-          onPress={() => {
-            // Navigate to golf courses list
-            router.push('/golf-courses' as any);
-          }}
-        >
-          <FontAwesome name="play-circle" size={24} color={colors.white} style={styles.playIcon} />
-          <Text style={styles.playButtonText}>Play Golf</Text>
-        </TouchableOpacity>
-
-        <View style={styles.separator} />
-        
-        <Text style={styles.sectionTitle}>Recent Courses</Text>
-        <FlatList
-          data={golfCourses.slice(0, 3)}
-          renderItem={renderCourseItem}
-          keyExtractor={item => item.id}
-          showsVerticalScrollIndicator={false}
+      <View style={styles.searchContainer}>
+        <FontAwesome name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search courses..."
+          placeholderTextColor={colors.textSecondary}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
         />
+        {searchQuery ? (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <FontAwesome name="times-circle" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
-      <StatusBar style={Platform.OS === "ios" ? "light" : "auto"} />
+      <FlatList
+        data={filteredCourses}
+        renderItem={renderCourseItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+      />
     </View>
   );
 }
@@ -146,39 +151,28 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: "bold",
+    fontWeight: 'bold',
     color: colors.text,
   },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  playButton: {
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primary,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
+    backgroundColor: colors.card,
+    margin: 16,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    height: 40,
   },
-  playIcon: {
-    marginRight: 12,
+  searchIcon: {
+    marginRight: 8,
   },
-  playButtonText: {
-    color: colors.white,
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  separator: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
     color: colors.text,
-    marginBottom: 16,
+  },
+  listContainer: {
+    padding: 16,
   },
   courseCard: {
     backgroundColor: colors.card,
@@ -223,4 +217,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
   },
-});
+}); 
