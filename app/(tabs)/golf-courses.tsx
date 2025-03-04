@@ -206,7 +206,6 @@ export default function GolfCoursesScreen() {
           source={{ uri: item.image }} 
           style={styles.courseImage}
           resizeMode="cover"
-          defaultSource={require('@/assets/images/placeholder.png')}
         />
         <View style={styles.courseInfo}>
           <Text style={styles.courseName}>{item.name}</Text>
