@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,7 +20,67 @@ interface FriendActivity {
   image?: string;
 }
 
-export default function HomeScreen() {
+const WeatherSection = memo(function WeatherSection({ 
+  weather, 
+  location 
+}: { 
+  weather: WeatherData | null; 
+  location: Location.LocationObject | null;
+}): JSX.Element {
+  return (
+    <View style={styles.weatherContainer}>
+      <View style={styles.weatherInfo}>
+        <Ionicons 
+          name={weather?.icon as any || 'sunny'} 
+          size={40} 
+          color="#FFD700" 
+        />
+        <View style={styles.weatherText}>
+          <Text style={styles.temperature}>{weather?.temperature}°F</Text>
+          <Text style={styles.condition}>{weather?.condition}</Text>
+        </View>
+      </View>
+      <Text style={styles.location}>
+        {location ? 'Current Location' : 'Location unavailable'}
+      </Text>
+    </View>
+  );
+});
+
+const ActivityCard = memo(function ActivityCard({ 
+  activity, 
+  onPress 
+}: { 
+  activity: FriendActivity; 
+  onPress: (id: string) => void;
+}): JSX.Element {
+  const formatDate = useCallback((dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+  }, []);
+
+  return (
+    <TouchableOpacity 
+      style={styles.activityCard}
+      onPress={() => onPress(activity.id)}
+    >
+      <Image 
+        source={{ uri: activity.image }} 
+        style={styles.activityImage}
+      />
+      <View style={styles.activityInfo}>
+        <Text style={styles.activityName}>{activity.name}</Text>
+        <Text style={styles.activityCourse}>{activity.course}</Text>
+        <Text style={styles.activityScore}>Score: {activity.score}</Text>
+        <Text style={styles.activityDate}>{formatDate(activity.date)}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+export default function HomeScreen(): JSX.Element {
   const router = useRouter();
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [recentActivity, setRecentActivity] = useState<FriendActivity[]>([
@@ -52,11 +112,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
 
-  useEffect(() => {
-    fetchWeather();
-  }, [location]);
-
-  const fetchWeather = async () => {
+  const fetchWeather = useCallback(async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -77,27 +133,24 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Error fetching weather:', error);
     }
-  };
-
-  const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    fetchWeather().finally(() => setRefreshing(false));
   }, []);
 
-  const handleStartRound = () => {
+  useEffect(() => {
+    fetchWeather();
+  }, [fetchWeather]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchWeather().finally(() => setRefreshing(false));
+  }, [fetchWeather]);
+
+  const handleStartRound = useCallback(() => {
     router.push('/(tabs)/golf-courses');
-  };
+  }, [router]);
 
-  const handleActivityPress = (activityId: string) => {
+  const handleActivityPress = useCallback((activityId: string) => {
     router.push('/course-stats');
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
-  };
+  }, [router]);
 
   return (
     <ScrollView 
@@ -106,23 +159,7 @@ export default function HomeScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* Weather Section */}
-      <View style={styles.weatherContainer}>
-        <View style={styles.weatherInfo}>
-          <Ionicons 
-            name={weather?.icon as any || 'sunny'} 
-            size={40} 
-            color="#FFD700" 
-          />
-          <View style={styles.weatherText}>
-            <Text style={styles.temperature}>{weather?.temperature}°F</Text>
-            <Text style={styles.condition}>{weather?.condition}</Text>
-          </View>
-        </View>
-        <Text style={styles.location}>
-          {location ? 'Current Location' : 'Location unavailable'}
-        </Text>
-      </View>
+      <WeatherSection weather={weather} location={location} />
 
       {/* Quick Actions */}
       <View style={styles.quickActions}>
@@ -139,22 +176,11 @@ export default function HomeScreen() {
       <View style={styles.activitySection}>
         <Text style={styles.sectionTitle}>Recent Activity</Text>
         {recentActivity.map((activity) => (
-          <TouchableOpacity 
+          <ActivityCard 
             key={activity.id}
-            style={styles.activityCard}
-            onPress={() => handleActivityPress(activity.id)}
-          >
-            <Image 
-              source={{ uri: activity.image }} 
-              style={styles.activityImage}
-            />
-            <View style={styles.activityInfo}>
-              <Text style={styles.activityName}>{activity.name}</Text>
-              <Text style={styles.activityCourse}>{activity.course}</Text>
-              <Text style={styles.activityScore}>Score: {activity.score}</Text>
-              <Text style={styles.activityDate}>{formatDate(activity.date)}</Text>
-            </View>
-          </TouchableOpacity>
+            activity={activity}
+            onPress={handleActivityPress}
+          />
         ))}
       </View>
     </ScrollView>
