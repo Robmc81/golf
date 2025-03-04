@@ -6,47 +6,74 @@ import { colors } from '@/constants/colors';
 import MapView, { Marker } from 'react-native-maps';
 import Share from 'react-native-share';
 
+interface GolfCourse {
+  id: string;
+  name: string;
+  location: string;
+  rating: string;
+  price: string;
+  description: string;
+  distance?: string;
+  latitude?: number;
+  longitude?: number;
+  image?: string;
+  type?: string;
+}
+
 export default function CourseDetailsScreen() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const params = useLocalSearchParams<{
-    id: string;
-    name: string;
-    location: string;
-    rating: string;
-    price: string;
-    description: string;
-    distance?: string;
-    latitude?: string;
-    longitude?: string;
-    image?: string;
-  }>();
+  const [course, setCourse] = useState<GolfCourse | null>(null);
+  const params = useLocalSearchParams<{ id: string }>();
 
   useEffect(() => {
-    // Validate required parameters
-    if (!params.id || !params.name || !params.location || !params.rating || !params.price || !params.description) {
-      setError('Invalid course details');
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(false);
-  }, [params]);
+    const fetchCourseDetails = async () => {
+      try {
+        if (!params.id) {
+          throw new Error('Course ID is required');
+        }
 
-  const coordinates = params.latitude && params.longitude
-    ? {
-        latitude: parseFloat(params.latitude),
-        longitude: parseFloat(params.longitude),
+        // TODO: Replace with actual API call
+        // For now, using mock data
+        const mockCourse: GolfCourse = {
+          id: params.id,
+          name: "Bobby Jones Golf Course",
+          location: "Atlanta, GA",
+          rating: "4.5",
+          price: "$75",
+          description: "A historic golf course in the heart of Atlanta, offering a challenging yet enjoyable experience for golfers of all skill levels.",
+          distance: "2.5",
+          latitude: 33.8487,
+          longitude: -84.3733,
+          image: "https://example.com/bobby-jones.jpg",
+          type: "Public"
+        };
+
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setCourse(mockCourse);
+        setIsLoading(false);
+      } catch (err) {
+        console.error('Error fetching course details:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load course details');
+        setIsLoading(false);
       }
-    : undefined;
+    };
+
+    fetchCourseDetails();
+  }, [params.id]);
 
   const handleStartRound = () => {
+    if (!course) return;
+    
     try {
       router.push({
         pathname: '/round-settings',
         params: {
-          courseId: params.id,
-          courseName: params.name
+          courseId: course.id,
+          courseName: course.name
         }
       });
     } catch (error) {
@@ -56,12 +83,14 @@ export default function CourseDetailsScreen() {
   };
 
   const handleViewStats = () => {
+    if (!course) return;
+    
     try {
       router.push({
         pathname: '/course-stats',
         params: {
-          courseId: params.id,
-          courseName: params.name
+          courseId: course.id,
+          courseName: course.name
         }
       });
     } catch (error) {
@@ -71,11 +100,13 @@ export default function CourseDetailsScreen() {
   };
 
   const handleShare = async () => {
+    if (!course) return;
+    
     try {
-      const message = `Join me for a round at ${params.name}!\n\nLocation: ${params.location}\nRating: ${params.rating}\nPrice: ${params.price}\n\n${params.description}\n\nCheck it out on the Golf App!`;
+      const message = `Join me for a round at ${course.name}!\n\nLocation: ${course.location}\nRating: ${course.rating}\nPrice: ${course.price}\n\n${course.description}\n\nCheck it out on the Golf App!`;
       
       await Share.open({
-        title: `Share ${params.name}`,
+        title: `Share ${course.name}`,
         message,
         type: 'text/plain',
       });
@@ -96,11 +127,11 @@ export default function CourseDetailsScreen() {
     );
   }
 
-  if (error) {
+  if (error || !course) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>{error || 'Course not found'}</Text>
           <TouchableOpacity 
             style={styles.retryButton}
             onPress={() => router.back()}
@@ -112,6 +143,13 @@ export default function CourseDetailsScreen() {
     );
   }
 
+  const coordinates = course.latitude && course.longitude
+    ? {
+        latitude: course.latitude,
+        longitude: course.longitude,
+      }
+    : undefined;
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -122,8 +160,8 @@ export default function CourseDetailsScreen() {
           <Ionicons name="chevron-back" size={24} color="#333" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.title}>{params.name}</Text>
-          <Text style={styles.courseName}>{params.location}</Text>
+          <Text style={styles.title}>{course.name}</Text>
+          <Text style={styles.courseName}>{course.location}</Text>
         </View>
         <TouchableOpacity 
           style={styles.shareButton}
@@ -134,9 +172,9 @@ export default function CourseDetailsScreen() {
       </View>
 
       <ScrollView style={styles.content}>
-        {params.image ? (
+        {course.image ? (
           <Image 
-            source={{ uri: params.image }} 
+            source={{ uri: course.image }} 
             style={styles.image}
             resizeMode="cover"
           />
@@ -149,26 +187,26 @@ export default function CourseDetailsScreen() {
         <View style={styles.infoContainer}>
           <View style={styles.infoItem}>
             <Ionicons name="star" size={20} color="#FFD700" />
-            <Text style={styles.infoText}>{params.rating}</Text>
+            <Text style={styles.infoText}>{course.rating}</Text>
           </View>
           <View style={styles.infoItem}>
             <Ionicons name="cash" size={20} color="#4CAF50" />
-            <Text style={styles.infoText}>{params.price}</Text>
+            <Text style={styles.infoText}>{course.price}</Text>
           </View>
-          {params.distance && (
+          {course.distance && (
             <View style={styles.infoItem}>
               <Ionicons name="navigate" size={20} color="#666" />
-              <Text style={styles.infoText}>{params.distance} km away</Text>
+              <Text style={styles.infoText}>{course.distance} km away</Text>
             </View>
           )}
         </View>
 
         <View style={styles.typeContainer}>
           <Text style={styles.typeLabel}>Course Type:</Text>
-          <Text style={styles.typeValue}>Public</Text>
+          <Text style={styles.typeValue}>{course.type || 'Public'}</Text>
         </View>
 
-        <Text style={styles.description}>{params.description}</Text>
+        <Text style={styles.description}>{course.description}</Text>
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
@@ -201,7 +239,7 @@ export default function CourseDetailsScreen() {
             >
               <Marker
                 coordinate={coordinates}
-                title={params.name}
+                title={course.name}
               />
             </MapView>
           </View>
@@ -250,50 +288,47 @@ const styles = StyleSheet.create({
   imagePlaceholder: {
     width: '100%',
     height: 250,
-    backgroundColor: colors.card,
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
   infoContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: colors.border,
+    justifyContent: 'space-around',
+    padding: 16,
+    backgroundColor: colors.background,
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   infoText: {
+    marginLeft: 8,
     fontSize: 16,
-    marginLeft: 4,
-    color: colors.textSecondary,
+    color: colors.text,
   },
   typeContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 16,
+    padding: 16,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
   },
   typeLabel: {
     fontSize: 16,
-    fontWeight: '600',
+    color: colors.textSecondary,
     marginRight: 8,
   },
   typeValue: {
     fontSize: 16,
-    color: colors.textSecondary,
+    color: colors.text,
+    fontWeight: '500',
   },
   description: {
+    padding: 16,
     fontSize: 16,
     color: colors.text,
     lineHeight: 24,
-    marginBottom: 24,
-    paddingHorizontal: 16,
   },
   buttonContainer: {
     padding: 16,
@@ -312,11 +347,11 @@ const styles = StyleSheet.create({
   },
   statsButton: {
     backgroundColor: colors.background,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.primary,
   },
   buttonText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#fff',
   },
@@ -325,27 +360,34 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     height: 200,
-    width: '100%',
-    marginTop: 16,
+    margin: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   map: {
     flex: 1,
   },
-  shareButton: {
-    padding: 8,
-    marginLeft: 8,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.textSecondary,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+    gap: 16,
   },
   errorText: {
     fontSize: 16,
     color: colors.error,
     textAlign: 'center',
-    marginBottom: 16,
   },
   retryButton: {
     backgroundColor: colors.primary,
@@ -358,15 +400,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginTop: 16,
+  shareButton: {
+    padding: 8,
+    marginLeft: 8,
   },
 }); 

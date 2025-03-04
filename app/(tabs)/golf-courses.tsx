@@ -153,16 +153,7 @@ export default function GolfCoursesScreen() {
       router.push({
         pathname: '/course-details',
         params: {
-          id: course.id,
-          name: course.name,
-          location: course.location,
-          rating: course.rating.toString(),
-          price: course.price,
-          image: course.image,
-          description: course.description,
-          holes: course.holes.toString(),
-          par: course.par.toString(),
-          distance: course.distance.toFixed(1)
+          id: course.id
         }
       });
     } catch (err) {

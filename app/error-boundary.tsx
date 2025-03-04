@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform, TouchableOpacity } from 'react-native';
 import { colors } from '@/constants/colors';
+import { router } from 'expo-router';
 
 interface Props {
   children: React.ReactNode;
@@ -79,7 +80,14 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Log the error
+    console.error('Error caught by boundary:', error);
+    console.error('Component stack:', errorInfo.componentStack);
+    
+    // Send error to parent iframe if on web
     sendErrorToIframeParent(error, errorInfo);
+    
+    // Call the onError prop if provided
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
@@ -87,6 +95,12 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   handleRetry = () => {
     this.setState({ hasError: false, error: null });
+    // Try to navigate back to a safe route
+    try {
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.error('Failed to navigate after error:', error);
+    }
   };
 
   render() {
