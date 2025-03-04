@@ -12,6 +12,10 @@ interface GolfCourse {
   price: string;
   image: string;
   description: string;
+  coordinates: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 // Mock data for Atlanta golf courses
@@ -23,7 +27,11 @@ const golfCourses: GolfCourse[] = [
     rating: 4.8,
     price: '$$$',
     image: 'https://example.com/eastlake.jpg',
-    description: 'Historic course that hosts the TOUR Championship'
+    description: 'Historic course that hosts the TOUR Championship',
+    coordinates: {
+      latitude: 33.7550,
+      longitude: -84.3900
+    }
   },
   {
     id: '2',
@@ -32,7 +40,11 @@ const golfCourses: GolfCourse[] = [
     rating: 4.7,
     price: '$$$',
     image: 'https://example.com/aac.jpg',
-    description: 'Prestigious private club with two championship courses'
+    description: 'Prestigious private club with two championship courses',
+    coordinates: {
+      latitude: 33.9489,
+      longitude: -84.2807
+    }
   },
   {
     id: '3',
@@ -41,7 +53,11 @@ const golfCourses: GolfCourse[] = [
     rating: 4.2,
     price: '$',
     image: 'https://example.com/bobbyjones.jpg',
-    description: 'Historic public course recently renovated'
+    description: 'Historic public course recently renovated',
+    coordinates: {
+      latitude: 33.7550,
+      longitude: -84.3900
+    }
   },
   {
     id: '4',
@@ -50,7 +66,11 @@ const golfCourses: GolfCourse[] = [
     rating: 4.6,
     price: '$$',
     image: 'https://example.com/sugarloaf.jpg',
-    description: 'Championship course designed by Greg Norman'
+    description: 'Championship course designed by Greg Norman',
+    coordinates: {
+      latitude: 33.9489,
+      longitude: -84.2807
+    }
   },
   {
     id: '5',
@@ -59,7 +79,11 @@ const golfCourses: GolfCourse[] = [
     rating: 3.8,
     price: '$',
     image: 'https://example.com/chastain.jpg',
-    description: 'Popular public course in the heart of Buckhead'
+    description: 'Popular public course in the heart of Buckhead',
+    coordinates: {
+      latitude: 33.8489,
+      longitude: -84.3807
+    }
   }
 ];
 
@@ -70,8 +94,20 @@ export default function ModalScreen() {
     <TouchableOpacity 
       style={styles.courseCard}
       onPress={() => {
-        // Navigate to course details (to be implemented)
-        console.log('Selected course:', item.name);
+        router.push({
+          pathname: '/course-details',
+          params: {
+            id: item.id,
+            name: item.name,
+            location: item.location,
+            rating: item.rating.toString(),
+            price: item.price,
+            description: item.description,
+            image: item.image,
+            latitude: item.coordinates.latitude.toString(),
+            longitude: item.coordinates.longitude.toString()
+          }
+        });
       }}
     >
       <View style={styles.courseInfo}>
@@ -106,7 +142,7 @@ export default function ModalScreen() {
           style={styles.playButton}
           onPress={() => {
             // Navigate to golf courses list
-            router.push('/golf-courses' as any);
+            router.push('/(tabs)/golf-courses');
           }}
         >
           <FontAwesome name="play-circle" size={24} color={colors.white} style={styles.playIcon} />
