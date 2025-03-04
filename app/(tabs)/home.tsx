@@ -85,7 +85,11 @@ export default function HomeScreen() {
   }, []);
 
   const handleStartRound = () => {
-    router.push('/golf-courses');
+    router.push('/(tabs)/golf-courses');
+  };
+
+  const handleActivityPress = (activityId: string) => {
+    router.push('/course-stats');
   };
 
   const formatDate = (dateString: string) => {
@@ -138,7 +142,7 @@ export default function HomeScreen() {
           <TouchableOpacity 
             key={activity.id}
             style={styles.activityCard}
-            onPress={() => router.push('/course-stats')}
+            onPress={() => handleActivityPress(activity.id)}
           >
             <Image 
               source={{ uri: activity.image }} 

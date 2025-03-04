@@ -27,7 +27,8 @@ export default function LoginScreen() {
 
     const user = login(email);
     if (user) {
-      router.replace('/(tabs)');
+      // The auth guard will handle navigation to home
+      // No need to navigate here
     } else {
       Alert.alert('Error', 'No user found with this email address');
     }

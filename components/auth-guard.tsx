@@ -8,12 +8,15 @@ export function AuthGuard() {
   const router = useRouter();
 
   useEffect(() => {
-    const inProtectedRoute = segments[0] !== '(auth)';
+    const inAuthGroup = segments[0] === '(auth)';
+    const inTabsGroup = segments[0] === '(tabs)';
     
-    if (!isLoggedIn && inProtectedRoute) {
-      router.replace('/(auth)/login' as any);
-    } else if (isLoggedIn && !inProtectedRoute) {
-      router.replace('/(tabs)' as any);
+    if (!isLoggedIn && !inAuthGroup) {
+      // Redirect to login if not logged in and not in auth group
+      router.replace('/(auth)/login');
+    } else if (isLoggedIn && inAuthGroup) {
+      // Redirect to home if logged in and in auth group
+      router.replace('/(tabs)/home');
     }
   }, [isLoggedIn, segments]);
 
