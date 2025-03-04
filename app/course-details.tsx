@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
@@ -21,6 +21,23 @@ export default function CourseDetailsScreen() {
     image?: string;
   }>();
 
+  // Validate required parameters
+  if (!params.id || !params.name || !params.location || !params.rating || !params.price || !params.description) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Invalid course details</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.retryButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const coordinates = params.latitude && params.longitude
     ? {
         latitude: parseFloat(params.latitude),
@@ -35,7 +52,7 @@ export default function CourseDetailsScreen() {
         courseId: params.id,
         courseName: params.name
       }
-    } as any);
+    });
   };
 
   const handleViewStats = () => {
@@ -45,7 +62,7 @@ export default function CourseDetailsScreen() {
         courseId: params.id,
         courseName: params.name
       }
-    } as any);
+    });
   };
 
   const handleShare = async () => {
@@ -84,10 +101,17 @@ export default function CourseDetailsScreen() {
       </View>
 
       <ScrollView style={styles.content}>
-        <Image 
-          source={{ uri: params.image as string }} 
-          style={styles.image}
-        />
+        {params.image ? (
+          <Image 
+            source={{ uri: params.image }} 
+            style={styles.image}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.imagePlaceholder}>
+            <Ionicons name="golf" size={48} color={colors.textSecondary} />
+          </View>
+        )}
         
         <View style={styles.infoContainer}>
           <View style={styles.infoItem}>
@@ -190,6 +214,13 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 250,
   },
+  imagePlaceholder: {
+    width: '100%',
+    height: 250,
+    backgroundColor: colors.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   infoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -254,7 +285,7 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
+    color: '#fff',
   },
   statsButtonText: {
     color: colors.primary,
@@ -270,5 +301,28 @@ const styles = StyleSheet.create({
   shareButton: {
     padding: 8,
     marginLeft: 8,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 

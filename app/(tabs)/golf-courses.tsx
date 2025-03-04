@@ -202,13 +202,15 @@ export default function GolfCoursesScreen() {
           id: item.id,
           name: item.name,
           location: item.location,
-          rating: item.rating,
+          rating: item.rating.toString(),
           price: item.price,
           image: item.image,
           description: item.description,
-          distance: item.distance?.toFixed(1)
+          distance: item.distance?.toFixed(1),
+          latitude: item.coordinates?.latitude?.toString(),
+          longitude: item.coordinates?.longitude?.toString()
         }
-      } as any)}
+      })}
     >
       <Image source={{ uri: item.image }} style={styles.courseImage} />
       <View style={styles.courseInfo}>
