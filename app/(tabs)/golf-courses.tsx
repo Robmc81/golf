@@ -196,21 +196,27 @@ export default function GolfCoursesScreen() {
   const renderCourseCard = ({ item }: { item: GolfCourse }) => (
     <TouchableOpacity
       style={styles.courseCard}
-      onPress={() => router.push({
-        pathname: '/course-details',
-        params: {
-          id: item.id,
-          name: item.name,
-          location: item.location,
-          rating: item.rating.toString(),
-          price: item.price,
-          image: item.image,
-          description: item.description,
-          distance: item.distance?.toFixed(1),
-          latitude: item.coordinates?.latitude?.toString(),
-          longitude: item.coordinates?.longitude?.toString()
+      onPress={() => {
+        try {
+          router.push({
+            pathname: '/course-details',
+            params: {
+              id: item.id,
+              name: item.name,
+              location: item.location,
+              rating: item.rating.toString(),
+              price: item.price,
+              image: item.image,
+              description: item.description,
+              distance: item.distance?.toFixed(1),
+              latitude: item.coordinates?.latitude?.toString(),
+              longitude: item.coordinates?.longitude?.toString()
+            }
+          });
+        } catch (error) {
+          console.error('Navigation error:', error);
         }
-      })}
+      }}
     >
       <Image source={{ uri: item.image }} style={styles.courseImage} />
       <View style={styles.courseInfo}>

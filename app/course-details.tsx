@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,8 @@ import Share from 'react-native-share';
 
 export default function CourseDetailsScreen() {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const params = useLocalSearchParams<{
     id: string;
     name: string;
@@ -21,12 +23,84 @@ export default function CourseDetailsScreen() {
     image?: string;
   }>();
 
-  // Validate required parameters
-  if (!params.id || !params.name || !params.location || !params.rating || !params.price || !params.description) {
+  useEffect(() => {
+    // Validate required parameters
+    if (!params.id || !params.name || !params.location || !params.rating || !params.price || !params.description) {
+      setError('Invalid course details');
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(false);
+  }, [params]);
+
+  const coordinates = params.latitude && params.longitude
+    ? {
+        latitude: parseFloat(params.latitude),
+        longitude: parseFloat(params.longitude),
+      }
+    : undefined;
+
+  const handleStartRound = () => {
+    try {
+      router.push({
+        pathname: '/round-settings',
+        params: {
+          courseId: params.id,
+          courseName: params.name
+        }
+      });
+    } catch (error) {
+      console.error('Navigation error:', error);
+      setError('Failed to navigate to round settings');
+    }
+  };
+
+  const handleViewStats = () => {
+    try {
+      router.push({
+        pathname: '/course-stats',
+        params: {
+          courseId: params.id,
+          courseName: params.name
+        }
+      });
+    } catch (error) {
+      console.error('Navigation error:', error);
+      setError('Failed to navigate to course stats');
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      const message = `Join me for a round at ${params.name}!\n\nLocation: ${params.location}\nRating: ${params.rating}\nPrice: ${params.price}\n\n${params.description}\n\nCheck it out on the Golf App!`;
+      
+      await Share.open({
+        title: `Share ${params.name}`,
+        message,
+        type: 'text/plain',
+      });
+    } catch (error) {
+      console.error('Share error:', error);
+      setError('Failed to share course details');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading course details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Invalid course details</Text>
+          <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity 
             style={styles.retryButton}
             onPress={() => router.back()}
@@ -37,47 +111,6 @@ export default function CourseDetailsScreen() {
       </SafeAreaView>
     );
   }
-
-  const coordinates = params.latitude && params.longitude
-    ? {
-        latitude: parseFloat(params.latitude),
-        longitude: parseFloat(params.longitude),
-      }
-    : undefined;
-
-  const handleStartRound = () => {
-    router.push({
-      pathname: '/round-settings',
-      params: {
-        courseId: params.id,
-        courseName: params.name
-      }
-    });
-  };
-
-  const handleViewStats = () => {
-    router.push({
-      pathname: '/course-stats',
-      params: {
-        courseId: params.id,
-        courseName: params.name
-      }
-    });
-  };
-
-  const handleShare = async () => {
-    const message = `Join me for a round at ${params.name}!\n\nLocation: ${params.location}\nRating: ${params.rating}\nPrice: ${params.price}\n\n${params.description}\n\nCheck it out on the Golf App!`;
-    
-    try {
-      await Share.open({
-        title: `Share ${params.name}`,
-        message,
-        type: 'text/plain',
-      });
-    } catch (error) {
-      console.log('Error sharing:', error);
-    }
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -324,5 +357,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginTop: 16,
   },
 }); 

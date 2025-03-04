@@ -1,7 +1,7 @@
 import { useEffect, memo } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, ErrorBoundary } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
@@ -49,14 +49,15 @@ const RootLayoutNav = memo(function RootLayoutNav(): JSX.Element {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AuthGuard />
-      <Stack>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen 
           name="course-details" 
           options={{ 
             headerShown: true,
-            title: 'Course Details'
+            title: 'Course Details',
+            presentation: 'card'
           }} 
         />
       </Stack>
