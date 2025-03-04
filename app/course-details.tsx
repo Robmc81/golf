@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
 import MapView, { Marker } from 'react-native-maps';
+import Share from 'react-native-share';
 
 export default function CourseDetailsScreen() {
   const router = useRouter();
@@ -47,6 +48,20 @@ export default function CourseDetailsScreen() {
     } as any);
   };
 
+  const handleShare = async () => {
+    const message = `Join me for a round at ${params.name}!\n\nLocation: ${params.location}\nRating: ${params.rating}\nPrice: ${params.price}\n\n${params.description}\n\nCheck it out on the Golf App!`;
+    
+    try {
+      await Share.open({
+        title: `Share ${params.name}`,
+        message,
+        type: 'text/plain',
+      });
+    } catch (error) {
+      console.log('Error sharing:', error);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -60,6 +75,12 @@ export default function CourseDetailsScreen() {
           <Text style={styles.title}>{params.name}</Text>
           <Text style={styles.courseName}>{params.location}</Text>
         </View>
+        <TouchableOpacity 
+          style={styles.shareButton}
+          onPress={handleShare}
+        >
+          <Ionicons name="share-social" size={24} color="#333" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content}>
@@ -245,5 +266,9 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  shareButton: {
+    padding: 8,
+    marginLeft: 8,
   },
 }); 
