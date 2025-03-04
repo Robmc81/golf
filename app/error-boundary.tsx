@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { colors } from '@/constants/colors';
 
 interface Props {
   children: React.ReactNode;
@@ -84,18 +85,28 @@ export class ErrorBoundary extends React.Component<Props, State> {
     }
   }
 
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
   render() {
     if (this.state.hasError) {
       return (
         <View style={styles.container}>
           <View style={styles.content}>
-            <Text style={styles.title}>Something went wrong</Text>
+            <Text style={styles.title}>Oops! Something went wrong</Text>
             <Text style={styles.subtitle}>{this.state.error?.message}</Text>
             {Platform.OS !== 'web' && (
               <Text style={styles.description}>
                 Please check your device logs for more details.
               </Text>
             )}
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={this.handleRetry}
+            >
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
           </View>
         </View>
       );
@@ -108,7 +119,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   content: {
     flex: 1,
@@ -117,23 +128,36 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   title: {
-    fontSize: 36,
+    fontSize: 24,
     textAlign: 'center',
     fontWeight: 'bold',
     marginBottom: 8,
+    color: colors.text,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 16,
+    color: colors.textSecondary,
     marginBottom: 12,
     textAlign: 'center',
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: 8,
   },
-}); 
+  retryButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
 
 export default ErrorBoundary;
