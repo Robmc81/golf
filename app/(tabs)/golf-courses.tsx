@@ -162,24 +162,28 @@ export default function GolfCoursesScreen() {
 
   const handleCoursePress = (course: GolfCourse) => {
     try {
+      if (!course || !course.id) {
+        throw new Error('Invalid course data');
+      }
+
       router.push({
         pathname: '/course-details',
         params: {
           id: course.id,
-          name: course.name,
-          location: course.location,
-          rating: course.rating.toString(),
-          price: course.price,
-          image: course.image,
-          description: course.description,
-          distance: course.distance?.toFixed(1),
-          latitude: course.coordinates.latitude.toString(),
-          longitude: course.coordinates.longitude.toString()
+          name: course.name || '',
+          location: course.location || '',
+          rating: course.rating?.toString() || '0',
+          price: course.price || '',
+          image: course.image || '',
+          description: course.description || '',
+          distance: course.distance?.toFixed(1) || '0',
+          latitude: course.coordinates?.latitude?.toString() || '0',
+          longitude: course.coordinates?.longitude?.toString() || '0'
         }
       });
     } catch (error) {
       console.error('Navigation error:', error);
-      setError('Failed to navigate to course details');
+      setError('Failed to navigate to course details. Please try again.');
     }
   };
 
@@ -188,32 +192,39 @@ export default function GolfCoursesScreen() {
     course.location.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const renderCourseCard = ({ item }: { item: GolfCourse }) => (
-    <TouchableOpacity
-      style={styles.courseCard}
-      onPress={() => handleCoursePress(item)}
-    >
-      <Image 
-        source={{ uri: item.image }} 
-        style={styles.courseImage}
-        resizeMode="cover"
-      />
-      <View style={styles.courseInfo}>
-        <Text style={styles.courseName}>{item.name}</Text>
-        <Text style={styles.courseLocation}>{item.location}</Text>
-        <View style={styles.courseDetails}>
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={16} color="#FFD700" />
-            <Text style={styles.rating}>{item.rating}</Text>
+  const renderCourseCard = ({ item }: { item: GolfCourse }) => {
+    if (!item || !item.id) {
+      return null;
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.courseCard}
+        onPress={() => handleCoursePress(item)}
+      >
+        <Image 
+          source={{ uri: item.image }} 
+          style={styles.courseImage}
+          resizeMode="cover"
+          defaultSource={require('@/assets/images/placeholder.png')}
+        />
+        <View style={styles.courseInfo}>
+          <Text style={styles.courseName}>{item.name}</Text>
+          <Text style={styles.courseLocation}>{item.location}</Text>
+          <View style={styles.courseDetails}>
+            <View style={styles.ratingContainer}>
+              <Ionicons name="star" size={16} color="#FFD700" />
+              <Text style={styles.rating}>{item.rating}</Text>
+            </View>
+            <Text style={styles.price}>{item.price}</Text>
+            {item.distance && (
+              <Text style={styles.distance}>{item.distance.toFixed(1)} km away</Text>
+            )}
           </View>
-          <Text style={styles.price}>{item.price}</Text>
-          {item.distance && (
-            <Text style={styles.distance}>{item.distance.toFixed(1)} km away</Text>
-          )}
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>

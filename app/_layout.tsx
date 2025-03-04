@@ -49,14 +49,22 @@ const RootLayoutNav = memo(function RootLayoutNav(): JSX.Element {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AuthGuard />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
+      <Stack>
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen 
           name="course-details" 
           options={{ 
             headerShown: true,
             title: 'Course Details',
+            presentation: 'card'
+          }} 
+        />
+        <Stack.Screen 
+          name="golf-courses" 
+          options={{ 
+            headerShown: true,
+            title: 'Golf Courses',
             presentation: 'card'
           }} 
         />
