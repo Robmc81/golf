@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, TextInput, SafeAreaView } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  TouchableOpacity, 
+  Image, 
+  ActivityIndicator,
+  SafeAreaView,
+  TextInput,
+  Alert
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import { FontAwesome } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
 
 interface GolfCourse {
@@ -13,11 +24,13 @@ interface GolfCourse {
   price: string;
   image: string;
   description: string;
+  holes: number;
+  par: number;
+  distance: number;
   coordinates: {
     latitude: number;
     longitude: number;
   };
-  distance?: number;
 }
 
 // Mock data for golf courses in Atlanta
@@ -28,63 +41,46 @@ const mockGolfCourses: GolfCourse[] = [
     location: 'Atlanta, GA',
     rating: 4.5,
     price: '$45',
-    image: 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800&auto=format&fit=crop&q=60',
-    description: 'Historic 9-hole course designed by Robert Trent Jones Sr. in 1932.',
+    image: 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    description: 'Historic 9-hole course designed by Robert Trent Jones Sr.',
+    holes: 9,
+    par: 35,
+    distance: 0,
     coordinates: {
       latitude: 33.8487,
-      longitude: -84.3794
+      longitude: -84.3737
     }
   },
   {
     id: '2',
-    name: 'East Lake Golf Club',
-    location: 'Atlanta, GA',
-    rating: 4.8,
-    price: '$150',
-    image: 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800&auto=format&fit=crop&q=60',
-    description: 'Home of the TOUR Championship and birthplace of Bobby Jones.',
-    coordinates: {
-      latitude: 33.7400,
-      longitude: -84.3100
-    }
-  },
-  {
-    id: '3',
-    name: 'Piedmont Driving Club',
-    location: 'Atlanta, GA',
-    rating: 4.7,
-    price: '$120',
-    image: 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800&auto=format&fit=crop&q=60',
-    description: 'Private club with a challenging 18-hole championship course.',
-    coordinates: {
-      latitude: 33.8500,
-      longitude: -84.3800
-    }
-  },
-  {
-    id: '4',
     name: 'Chastain Park Golf Course',
     location: 'Atlanta, GA',
     rating: 4.2,
     price: '$35',
-    image: 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800&auto=format&fit=crop&q=60',
-    description: 'Public 9-hole course in the heart of Buckhead.',
+    image: 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    description: 'Public course with challenging layout and scenic views.',
+    holes: 18,
+    par: 72,
+    distance: 0,
     coordinates: {
-      latitude: 33.8900,
-      longitude: -84.3800
+      latitude: 33.8915,
+      longitude: -84.3797
     }
   },
   {
-    id: '5',
+    id: '3',
     name: 'North Fulton Golf Course',
     location: 'Atlanta, GA',
-    rating: 4.3,
-    price: '$40',
-    image: 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800&auto=format&fit=crop&q=60',
-    description: 'Challenging 18-hole course with beautiful tree-lined fairways.',
+    rating: 4.7,
+    price: '$55',
+    image: 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    description: 'Championship course with well-maintained fairways and greens.',
+    holes: 18,
+    par: 72,
+    distance: 0,
     coordinates: {
-      latitude: 33.9200,
-      longitude: -84.3500
+      latitude: 33.9876,
+      longitude: -84.3797
     }
   }
 ];
@@ -92,7 +88,6 @@ const mockGolfCourses: GolfCourse[] = [
 export default function GolfCoursesScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nearbyCourses, setNearbyCourses] = useState<GolfCourse[]>([]);
@@ -103,43 +98,42 @@ export default function GolfCoursesScreen() {
 
   const loadCourses = async () => {
     try {
+      setLoading(true);
+      setError(null);
+
+      // Request location permissions
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setError('Permission to access location was denied');
-        setLoading(false);
-        return;
+        throw new Error('Location permission not granted');
       }
 
-      const currentLocation = await Location.getCurrentPositionAsync({});
-      setLocation(currentLocation);
+      // Get current location
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
 
       // Calculate distances and sort courses
-      const coursesWithDistance = mockGolfCourses.map(course => ({
-        ...course,
-        distance: calculateDistance(
-          currentLocation.coords.latitude,
-          currentLocation.coords.longitude,
+      const coursesWithDistance = mockGolfCourses.map(course => {
+        const distance = calculateDistance(
+          latitude,
+          longitude,
           course.coordinates.latitude,
           course.coordinates.longitude
-        )
-      }));
+        );
+        return { ...course, distance };
+      });
 
-      const sortedCourses = coursesWithDistance.sort((a, b) => 
-        (a.distance || 0) - (b.distance || 0)
-      );
-
-      setNearbyCourses(sortedCourses);
+      // Sort by distance
+      coursesWithDistance.sort((a, b) => a.distance - b.distance);
+      setNearbyCourses(coursesWithDistance);
     } catch (err) {
-      console.error('Error loading courses:', err);
-      setError('Error getting location');
-      setNearbyCourses(mockGolfCourses);
+      setError(err instanceof Error ? err.message : 'Failed to load courses');
     } finally {
       setLoading(false);
     }
   };
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Earth's radius in kilometers
+    const R = 6371; // Earth's radius in km
     const dLat = toRad(lat2 - lat1);
     const dLon = toRad(lon2 - lon1);
     const a = 
@@ -154,36 +148,28 @@ export default function GolfCoursesScreen() {
     return value * Math.PI / 180;
   };
 
-  const handleRetryLocation = async () => {
-    setLoading(true);
-    setError(null);
-    await loadCourses();
-  };
-
   const handleCoursePress = (course: GolfCourse) => {
     try {
-      if (!course || !course.id) {
-        throw new Error('Invalid course data');
-      }
-
       router.push({
         pathname: '/course-details',
         params: {
           id: course.id,
-          name: course.name || '',
-          location: course.location || '',
-          rating: course.rating?.toString() || '0',
-          price: course.price || '',
-          image: course.image || '',
-          description: course.description || '',
-          distance: course.distance?.toFixed(1) || '0',
-          latitude: course.coordinates?.latitude?.toString() || '0',
-          longitude: course.coordinates?.longitude?.toString() || '0'
+          name: course.name,
+          location: course.location,
+          rating: course.rating.toString(),
+          price: course.price,
+          image: course.image,
+          description: course.description,
+          holes: course.holes.toString(),
+          par: course.par.toString(),
+          distance: course.distance.toFixed(1)
         }
       });
-    } catch (error) {
-      console.error('Navigation error:', error);
-      setError('Failed to navigate to course details. Please try again.');
+    } catch (err) {
+      Alert.alert(
+        'Navigation Error',
+        'Unable to open course details. Please try again.'
+      );
     }
   };
 
@@ -192,73 +178,73 @@ export default function GolfCoursesScreen() {
     course.location.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const renderCourseCard = ({ item }: { item: GolfCourse }) => {
-    if (!item || !item.id) {
-      return null;
-    }
-
-    return (
-      <TouchableOpacity
-        style={styles.courseCard}
-        onPress={() => handleCoursePress(item)}
-      >
-        <Image 
-          source={{ uri: item.image }} 
-          style={styles.courseImage}
-          resizeMode="cover"
-        />
-        <View style={styles.courseInfo}>
-          <Text style={styles.courseName}>{item.name}</Text>
-          <Text style={styles.courseLocation}>{item.location}</Text>
-          <View style={styles.courseDetails}>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={16} color="#FFD700" />
-              <Text style={styles.rating}>{item.rating}</Text>
-            </View>
-            <Text style={styles.price}>{item.price}</Text>
-            {item.distance && (
-              <Text style={styles.distance}>{item.distance.toFixed(1)} km away</Text>
-            )}
+  const renderCourseCard = ({ item }: { item: GolfCourse }) => (
+    <TouchableOpacity 
+      style={styles.courseCard}
+      onPress={() => handleCoursePress(item)}
+    >
+      <Image 
+        source={{ uri: item.image }} 
+        style={styles.courseImage}
+        resizeMode="cover"
+      />
+      <View style={styles.courseInfo}>
+        <Text style={styles.courseName}>{item.name}</Text>
+        <Text style={styles.courseLocation}>{item.location}</Text>
+        <View style={styles.courseDetails}>
+          <View style={styles.ratingContainer}>
+            <FontAwesome name="star" size={16} color={colors.primary} />
+            <Text style={styles.ratingText}>{item.rating}</Text>
           </View>
+          <Text style={styles.priceText}>{item.price}</Text>
+          <Text style={styles.distanceText}>{item.distance.toFixed(1)} km</Text>
         </View>
-      </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading courses...</Text>
+      </View>
     );
-  };
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={loadCourses}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+        <FontAwesome name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search courses..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholderTextColor="#666"
+          placeholderTextColor={colors.textSecondary}
         />
       </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Finding nearby courses...</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRetryLocation}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredCourses}
-          renderItem={renderCourseCard}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+      <FlatList
+        data={filteredCourses}
+        renderItem={renderCourseCard}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+      />
     </SafeAreaView>
   );
 }
@@ -271,82 +257,45 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.card,
-    margin: 16,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    padding: 16,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 12,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
+    height: 40,
     fontSize: 16,
     color: colors.text,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  errorText: {
-    fontSize: 16,
-    color: colors.error,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   listContainer: {
     padding: 16,
   },
   courseCard: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.white,
     borderRadius: 12,
     marginBottom: 16,
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    elevation: 3,
   },
   courseImage: {
     width: '100%',
     height: 200,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   courseInfo: {
     padding: 16,
   },
   courseName: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: colors.text,
     marginBottom: 4,
   },
@@ -364,18 +313,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  rating: {
+  ratingText: {
     marginLeft: 4,
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.text,
   },
-  price: {
+  priceText: {
     fontSize: 14,
     color: colors.primary,
     fontWeight: '600',
   },
-  distance: {
+  distanceText: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: colors.text,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    padding: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 
