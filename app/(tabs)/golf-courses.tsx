@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, TextInput, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '@/constants/colors';
 
 interface GolfCourse {
   id: string;
@@ -97,62 +98,10 @@ export default function GolfCoursesScreen() {
   const [nearbyCourses, setNearbyCourses] = useState<GolfCourse[]>([]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setError('Permission to access location was denied');
-          setLoading(false);
-          return;
-        }
-
-        const currentLocation = await Location.getCurrentPositionAsync({});
-        setLocation(currentLocation);
-
-        // Calculate distances and sort courses
-        const coursesWithDistance = mockGolfCourses.map(course => ({
-          ...course,
-          distance: calculateDistance(
-            currentLocation.coords.latitude,
-            currentLocation.coords.longitude,
-            course.coordinates.latitude,
-            course.coordinates.longitude
-          )
-        }));
-
-        const sortedCourses = coursesWithDistance.sort((a, b) => 
-          (a.distance || 0) - (b.distance || 0)
-        );
-
-        setNearbyCourses(sortedCourses);
-      } catch (err) {
-        setError('Error getting location');
-        setNearbyCourses(mockGolfCourses);
-      } finally {
-        setLoading(false);
-      }
-    })();
+    loadCourses();
   }, []);
 
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Earth's radius in kilometers
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  const toRad = (value: number): number => {
-    return value * Math.PI / 180;
-  };
-
-  const handleRetryLocation = async () => {
-    setLoading(true);
-    setError(null);
+  const loadCourses = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -181,10 +130,56 @@ export default function GolfCoursesScreen() {
 
       setNearbyCourses(sortedCourses);
     } catch (err) {
+      console.error('Error loading courses:', err);
       setError('Error getting location');
       setNearbyCourses(mockGolfCourses);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  const toRad = (value: number): number => {
+    return value * Math.PI / 180;
+  };
+
+  const handleRetryLocation = async () => {
+    setLoading(true);
+    setError(null);
+    await loadCourses();
+  };
+
+  const handleCoursePress = (course: GolfCourse) => {
+    try {
+      router.push({
+        pathname: '/course-details',
+        params: {
+          id: course.id,
+          name: course.name,
+          location: course.location,
+          rating: course.rating.toString(),
+          price: course.price,
+          image: course.image,
+          description: course.description,
+          distance: course.distance?.toFixed(1),
+          latitude: course.coordinates.latitude.toString(),
+          longitude: course.coordinates.longitude.toString()
+        }
+      });
+    } catch (error) {
+      console.error('Navigation error:', error);
+      setError('Failed to navigate to course details');
     }
   };
 
@@ -196,29 +191,13 @@ export default function GolfCoursesScreen() {
   const renderCourseCard = ({ item }: { item: GolfCourse }) => (
     <TouchableOpacity
       style={styles.courseCard}
-      onPress={() => {
-        try {
-          router.push({
-            pathname: '/course-details',
-            params: {
-              id: item.id,
-              name: item.name,
-              location: item.location,
-              rating: item.rating.toString(),
-              price: item.price,
-              image: item.image,
-              description: item.description,
-              distance: item.distance?.toFixed(1),
-              latitude: item.coordinates?.latitude?.toString(),
-              longitude: item.coordinates?.longitude?.toString()
-            }
-          });
-        } catch (error) {
-          console.error('Navigation error:', error);
-        }
-      }}
+      onPress={() => handleCoursePress(item)}
     >
-      <Image source={{ uri: item.image }} style={styles.courseImage} />
+      <Image 
+        source={{ uri: item.image }} 
+        style={styles.courseImage}
+        resizeMode="cover"
+      />
       <View style={styles.courseInfo}>
         <Text style={styles.courseName}>{item.name}</Text>
         <Text style={styles.courseLocation}>{item.location}</Text>
@@ -237,7 +216,7 @@ export default function GolfCoursesScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
         <TextInput
@@ -245,12 +224,13 @@ export default function GolfCoursesScreen() {
           placeholder="Search courses..."
           value={searchQuery}
           onChangeText={setSearchQuery}
+          placeholderTextColor="#666"
         />
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Finding nearby courses...</Text>
         </View>
       ) : error ? (
@@ -266,21 +246,22 @@ export default function GolfCoursesScreen() {
           renderItem={renderCourseCard}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     margin: 16,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -297,6 +278,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     fontSize: 16,
+    color: colors.text,
   },
   loadingContainer: {
     flex: 1,
@@ -306,7 +288,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
   },
   errorContainer: {
     flex: 1,
@@ -316,12 +298,12 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#f44336',
+    color: colors.error,
     textAlign: 'center',
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -335,7 +317,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   courseCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     marginBottom: 16,
     overflow: 'hidden',
@@ -355,11 +337,12 @@ const styles = StyleSheet.create({
   courseName: {
     fontSize: 18,
     fontWeight: '600',
+    color: colors.text,
     marginBottom: 4,
   },
   courseLocation: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     marginBottom: 8,
   },
   courseDetails: {
@@ -374,15 +357,15 @@ const styles = StyleSheet.create({
   rating: {
     marginLeft: 4,
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
   },
   price: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: colors.primary,
     fontWeight: '600',
   },
   distance: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
   },
 }); 
