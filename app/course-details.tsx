@@ -1,9 +1,28 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, SafeAreaView } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Region } from 'react-native-maps';
+import { useAppStore } from '@/hooks/use-app-store';
+
+interface CourseParams {
+  id: string;
+  name: string;
+  location: string;
+  rating: string;
+  price: string;
+  description: string;
+  distance?: string;
+  latitude?: string;
+  longitude?: string;
+  image?: string;
+}
+
+interface Coordinates {
+  latitude: number;
+  longitude: number;
+}
 
 /**
  * CourseDetailsScreen Component
@@ -15,8 +34,9 @@ import MapView, { Marker } from 'react-native-maps';
  * - Options to start a round or view course statistics
  */
 export default function CourseDetailsScreen() {
-  // Initialize router for navigation
   const router = useRouter();
+  const { currentUser } = useAppStore();
+  
   // Get route parameters with type safety
   const params = useLocalSearchParams<{
     id: string;
@@ -32,40 +52,66 @@ export default function CourseDetailsScreen() {
   }>();
 
   // Parse coordinates for map display if available
-  const coordinates = params.latitude && params.longitude
-    ? {
-        latitude: parseFloat(params.latitude),
-        longitude: parseFloat(params.longitude),
-      }
-    : undefined;
+  const coordinates = useMemo(() => {
+    if (!params.latitude || !params.longitude) return undefined;
+    
+    return {
+      latitude: parseFloat(params.latitude),
+      longitude: parseFloat(params.longitude),
+    } as Coordinates;
+  }, [params.latitude, params.longitude]);
+
+  // Calculate initial region for map
+  const initialRegion = useMemo(() => {
+    if (!coordinates) return undefined;
+    
+    return {
+      ...coordinates,
+      latitudeDelta: 0.0922,
+      longitudeDelta: 0.0421,
+    } as Region;
+  }, [coordinates]);
 
   /**
    * Navigate to round settings screen
    * Passes course information as route parameters
    */
-  const handleStartRound = () => {
+  const handleStartRound = useCallback(() => {
     router.push({
       pathname: '/round-settings',
       params: {
         courseId: params.id,
         courseName: params.name
       }
-    } as any);
-  };
+    });
+  }, [router, params.id, params.name]);
 
   /**
    * Navigate to course statistics screen
    * Passes course information as route parameters
    */
-  const handleViewStats = () => {
+  const handleViewStats = useCallback(() => {
     router.push({
       pathname: '/course-stats',
       params: {
         courseId: params.id,
         courseName: params.name
       }
-    } as any);
-  };
+    });
+  }, [router, params.id, params.name]);
+
+  const handleBack = useCallback(() => {
+    router.back();
+  }, [router]);
+
+  // Show loading state when currentUser is not available
+  if (!currentUser) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -73,9 +119,10 @@ export default function CourseDetailsScreen() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleBack}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="chevron-back" size={24} color="#333" />
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.title}>{params.name}</Text>
@@ -86,27 +133,30 @@ export default function CourseDetailsScreen() {
       {/* Scrollable content area */}
       <ScrollView style={styles.content}>
         {/* Course image */}
-        <Image 
-          source={{ uri: params.image as string }} 
-          style={styles.image}
-        />
+        {params.image && (
+          <Image 
+            source={{ uri: params.image }} 
+            style={styles.image}
+            resizeMode="cover"
+          />
+        )}
         
         {/* Course information section */}
         <View style={styles.infoContainer}>
           {/* Rating display */}
           <View style={styles.infoItem}>
-            <Ionicons name="star" size={20} color="#FFD700" />
+            <Ionicons name="star" size={20} color={colors.warning} />
             <Text style={styles.infoText}>{params.rating}</Text>
           </View>
           {/* Price display */}
           <View style={styles.infoItem}>
-            <Ionicons name="cash" size={20} color="#4CAF50" />
+            <Ionicons name="cash" size={20} color={colors.success} />
             <Text style={styles.infoText}>{params.price}</Text>
           </View>
           {/* Distance display (if available) */}
           {params.distance && (
             <View style={styles.infoItem}>
-              <Ionicons name="navigate" size={20} color="#666" />
+              <Ionicons name="navigate" size={20} color={colors.textSecondary} />
               <Text style={styles.infoText}>{params.distance} km away</Text>
             </View>
           )}
@@ -127,8 +177,9 @@ export default function CourseDetailsScreen() {
           <TouchableOpacity 
             style={[styles.button, styles.startRoundButton]}
             onPress={handleStartRound}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="play-circle" size={24} color="#fff" />
+            <Ionicons name="play-circle" size={24} color={colors.white} />
             <Text style={styles.buttonText}>Start Round</Text>
           </TouchableOpacity>
 
@@ -136,22 +187,19 @@ export default function CourseDetailsScreen() {
           <TouchableOpacity 
             style={[styles.button, styles.statsButton]}
             onPress={handleViewStats}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="stats-chart" size={24} color="#4CAF50" />
+            <Ionicons name="stats-chart" size={24} color={colors.success} />
             <Text style={[styles.buttonText, styles.statsButtonText]}>Course Stats</Text>
           </TouchableOpacity>
         </View>
 
         {/* Interactive map (if coordinates are available) */}
-        {coordinates && (
+        {coordinates && initialRegion && (
           <View style={styles.mapContainer}>
             <MapView
               style={styles.map}
-              initialRegion={{
-                ...coordinates,
-                latitudeDelta: 0.0922,
-                longitudeDelta: 0.0421,
-              }}
+              initialRegion={initialRegion}
               scrollEnabled={false}
             >
               <Marker
@@ -174,6 +222,12 @@ const styles = StyleSheet.create({
   // Container styles
   container: {
     flex: 1,
+    backgroundColor: colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: colors.background,
   },
   // Header styles
@@ -242,6 +296,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginRight: 8,
+    color: colors.text,
   },
   typeValue: {
     fontSize: 16,
@@ -252,43 +307,50 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
     lineHeight: 24,
-    marginBottom: 24,
     paddingHorizontal: 16,
+    marginBottom: 24,
   },
   // Button container styles
   buttonContainer: {
-    padding: 16,
-    gap: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 24,
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
-    gap: 8,
+    flex: 1,
+    marginHorizontal: 8,
   },
   startRoundButton: {
     backgroundColor: colors.primary,
   },
   statsButton: {
-    backgroundColor: colors.background,
-    borderWidth: 2,
-    borderColor: colors.primary,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.success,
   },
   buttonText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    marginLeft: 8,
+    color: colors.white,
   },
   statsButtonText: {
-    color: colors.primary,
+    color: colors.success,
   },
   // Map styles
   mapContainer: {
     height: 200,
-    width: '100%',
-    marginTop: 16,
+    marginHorizontal: 16,
+    marginBottom: 24,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   map: {
     flex: 1,

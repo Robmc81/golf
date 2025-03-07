@@ -1,14 +1,17 @@
-import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { colors } from '@/constants/colors';
 
 /**
  * Props interface for the ErrorBoundary component
  * @property children - React components to be wrapped by the error boundary
  * @property onError - Optional callback function to handle errors
+ * @property onRetry - Optional callback function to handle retry attempts
  */
 interface Props {
   children: React.ReactNode;
   onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+  onRetry?: () => void;
 }
 
 /**
@@ -29,14 +32,27 @@ const webTargetOrigins = [
   "http://localhost:3000",
   "https://rorkai.com",
   "https://rork.app",
-];    
+] as const;
+
+type WebTargetOrigin = typeof webTargetOrigins[number];
+
+interface ErrorMessage {
+  type: 'ERROR';
+  error: {
+    message: string;
+    stack?: string;
+    componentStack?: string;
+    timestamp: string;
+  };
+  iframeId: string;
+}
 
 /**
  * Sends error information to the parent iframe in web environments
  * @param error - The error object to send
  * @param errorInfo - Additional error information from React
  */
-function sendErrorToIframeParent(error: any, errorInfo?: any) {
+function sendErrorToIframeParent(error: unknown, errorInfo?: React.ErrorInfo): void {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     console.debug('Sending error to parent:', {
       error,
@@ -45,12 +61,12 @@ function sendErrorToIframeParent(error: any, errorInfo?: any) {
     });
 
     // Prepare error message for parent window
-    const errorMessage = {
+    const errorMessage: ErrorMessage = {
       type: 'ERROR',
       error: {
-        message: error?.message || error?.toString() || 'Unknown error',
-        stack: error?.stack,
-        componentStack: errorInfo?.componentStack,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack ?? undefined : undefined,
+        componentStack: errorInfo?.componentStack ?? undefined,
         timestamp: new Date().toISOString(),
       },
       iframeId: IFRAME_ID,
@@ -58,10 +74,11 @@ function sendErrorToIframeParent(error: any, errorInfo?: any) {
 
     try {
       // Send error message to parent window
-      window.parent.postMessage(
-        errorMessage,
-        webTargetOrigins.includes(document.referrer) ? document.referrer : '*'
-      );
+      const targetOrigin = webTargetOrigins.includes(document.referrer as WebTargetOrigin)
+        ? document.referrer
+        : '*';
+      
+      window.parent.postMessage(errorMessage, targetOrigin);
     } catch (postMessageError) {
       console.error('Failed to send error to parent:', postMessageError);
     }
@@ -106,7 +123,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
    * @param error - The error that was caught
    * @returns New state object
    */
-  static getDerivedStateFromError(error: Error) {
+  static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
@@ -114,7 +131,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
    * Lifecycle method called when an error is caught
    * Logs the error and calls the onError callback if provided
    */
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     sendErrorToIframeParent(error, errorInfo);
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
@@ -122,9 +139,19 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   /**
+   * Handles retry attempts
+   */
+  private handleRetry = (): void => {
+    this.setState({ hasError: false, error: null });
+    if (this.props.onRetry) {
+      this.props.onRetry();
+    }
+  };
+
+  /**
    * Renders either the error UI or the children components
    */
-  render() {
+  render(): React.ReactNode {
     if (this.state.hasError) {
       return (
         <View style={styles.container}>
@@ -136,6 +163,13 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 Please check your device logs for more details.
               </Text>
             )}
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={this.handleRetry}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
           </View>
         </View>
       );
@@ -153,7 +187,7 @@ const styles = StyleSheet.create({
   // Container styles
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   // Content styles
   content: {
@@ -167,19 +201,32 @@ const styles = StyleSheet.create({
     fontSize: 36,
     textAlign: 'center',
     fontWeight: 'bold',
+    color: colors.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     marginBottom: 12,
     textAlign: 'center',
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: 8,
+  },
+  retryButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

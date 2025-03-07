@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,11 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  Alert
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAppStore } from '@/hooks/use-app-store';
+import { useAuth } from '@/lib/auth';
 import { colors } from '@/constants/colors';
 
 /**
@@ -22,13 +23,13 @@ import { colors } from '@/constants/colors';
  * - Keyboard-aware layout
  * - Error handling with alerts
  * - Navigation after successful login
+ * - Loading state handling
  */
 export default function LoginScreen() {
-  // State management for email input
+  // State management
   const [email, setEmail] = useState('');
-  // Get login function from global app store
-  const { login } = useAppStore();
-  // Initialize router for navigation
+  const [password, setPassword] = useState('');
+  const { signIn, isLoading } = useAuth();
   const router = useRouter();
 
   /**
@@ -37,22 +38,20 @@ export default function LoginScreen() {
    * - Attempts to login user
    * - Navigates to main app or shows error
    */
-  const handleLogin = () => {
+  const handleLogin = useCallback(async () => {
     // Validate email is not empty
     if (!email.trim()) {
       Alert.alert('Error', 'Please enter your email address');
       return;
     }
 
-    // Attempt to login user
-    const user = login(email);
-    if (user) {
-      // Navigate to main app tabs on success
-      router.replace('/(tabs)' as any); // Type assertion to fix router type error
-    } else {
-      Alert.alert('Error', 'No user found with this email address');
+    try {
+      await signIn(email, password);
+      // Auth guard will handle navigation
+    } catch (error) {
+      Alert.alert('Error', 'Invalid email or password');
     }
-  };
+  }, [email, password, signIn]);
 
   return (
     // KeyboardAvoidingView ensures content is visible when keyboard appears
@@ -82,11 +81,32 @@ export default function LoginScreen() {
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
+            editable={!isLoading}
+          />
+
+          {/* Password input field */}
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoComplete="password"
+            editable={!isLoading}
           />
 
           {/* Login button */}
-          <TouchableOpacity style={styles.button} onPress={handleLogin}>
-            <Text style={styles.buttonText}>Log In</Text>
+          <TouchableOpacity 
+            style={[styles.button, isLoading && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.buttonText}>Log In</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -149,6 +169,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
+  },
+  // Disabled button styles
+  buttonDisabled: {
+    opacity: 0.7,
   },
   // Button text styles
   buttonText: {

@@ -4,24 +4,34 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 interface User {
   id: string;
   email: string;
-  // Add other user properties as needed
+  name: string;
+  avatar?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Mock user data for testing
+const MOCK_USER: User = {
+  id: '1',
+  email: 'test@example.com',
+  name: 'Test User',
+  avatar: 'https://example.com/avatar.jpg'
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Load user on mount
   useEffect(() => {
-    // Check for existing session
     loadUser();
   }, []);
 
@@ -41,13 +51,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      // Implement your sign in logic here
-      // For example:
-      const user = { id: '1', email }; // Replace with actual user data
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-      setUser(user);
+      
+      // Mock authentication - accept any password for test@example.com
+      if (email === 'test@example.com') {
+        await AsyncStorage.setItem('user', JSON.stringify(MOCK_USER));
+        setUser(MOCK_USER);
+      } else {
+        throw new Error('Invalid credentials');
+      }
     } catch (error) {
       console.error('Error signing in:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signUp = async (email: string, password: string, name: string) => {
+    try {
+      setIsLoading(true);
+      
+      // Mock registration
+      const newUser: User = {
+        id: Date.now().toString(),
+        email,
+        name,
+        avatar: 'https://example.com/default-avatar.jpg'
+      };
+      
+      await AsyncStorage.setItem('user', JSON.stringify(newUser));
+      setUser(newUser);
+    } catch (error) {
+      console.error('Error signing up:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -68,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, isLoading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

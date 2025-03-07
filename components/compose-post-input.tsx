@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, TextInput, StyleSheet, TouchableOpacity, Text, Image, Platform, Alert } from 'react-native';
+import { View, TextInput, StyleSheet, TouchableOpacity, Text, Image, Platform, Alert, ActivityIndicator } from 'react-native';
 import { MapPin, X, Flag, Image as ImageIcon } from 'lucide-react-native';
 import { colors } from '@/constants/colors';
 import { useAppStore } from '@/hooks/use-app-store';
 import * as ImagePicker from 'expo-image-picker';
+import { emitEvent } from '@/utils/event-register';
 
 interface ComposePostInputProps {
   onPostCreated?: () => void;
@@ -18,10 +19,22 @@ export const ComposePostInput: React.FC<ComposePostInputProps> = ({ onPostCreate
   const [showCourseInput, setShowCourseInput] = useState(false);
   const [showScoreInput, setShowScoreInput] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isPosting, setIsPosting] = useState(false);
   
-  const handlePost = () => {
-    if (text.trim()) {
-      createPost(
+  const handlePost = async () => {
+    if (!currentUser) {
+      Alert.alert('Error', 'You must be logged in to create a post');
+      return;
+    }
+
+    if (!text.trim()) {
+      Alert.alert('Error', 'Please enter some text for your post');
+      return;
+    }
+
+    try {
+      setIsPosting(true);
+      const newPost = await createPost(
         text, 
         selectedImage ? [selectedImage] : undefined, 
         course.trim() || undefined, 
@@ -29,6 +42,7 @@ export const ComposePostInput: React.FC<ComposePostInputProps> = ({ onPostCreate
         par ? parseInt(par) : undefined
       );
       
+      // Clear form
       setText('');
       setCourse('');
       setScore('');
@@ -37,13 +51,23 @@ export const ComposePostInput: React.FC<ComposePostInputProps> = ({ onPostCreate
       setShowScoreInput(false);
       setSelectedImage(null);
       
+      // Emit event to refresh feed
+      emitEvent('refreshFeed', newPost);
+      
+      // Call onPostCreated callback
       if (onPostCreated) {
         onPostCreated();
       }
+    } catch (error) {
+      console.error('Error creating post:', error);
+      Alert.alert('Error', 'Failed to create post. Please try again.');
+    } finally {
+      setIsPosting(false);
     }
   };
   
   const toggleCourseInput = () => {
+    if (isPosting) return;
     setShowCourseInput(!showCourseInput);
     if (showCourseInput) {
       setCourse('');
@@ -51,6 +75,7 @@ export const ComposePostInput: React.FC<ComposePostInputProps> = ({ onPostCreate
   };
   
   const toggleScoreInput = () => {
+    if (isPosting) return;
     setShowScoreInput(!showScoreInput);
     if (showScoreInput) {
       setScore('');
@@ -59,6 +84,8 @@ export const ComposePostInput: React.FC<ComposePostInputProps> = ({ onPostCreate
   };
 
   const pickImage = async () => {
+    if (isPosting) return;
+    
     try {
       if (Platform.OS !== 'web') {
         // Request permissions
@@ -90,7 +117,10 @@ export const ComposePostInput: React.FC<ComposePostInputProps> = ({ onPostCreate
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Image source={{ uri: currentUser.avatar }} style={styles.avatar} />
+        <Image 
+          source={{ uri: currentUser?.avatar || 'https://example.com/default-avatar.jpg' }} 
+          style={styles.avatar} 
+        />
         <Text style={styles.headerText}>What's happening on the course?</Text>
       </View>
       
@@ -101,6 +131,7 @@ export const ComposePostInput: React.FC<ComposePostInputProps> = ({ onPostCreate
         multiline
         value={text}
         onChangeText={setText}
+        editable={!isPosting}
       />
       
       {selectedImage && (
@@ -109,6 +140,7 @@ export const ComposePostInput: React.FC<ComposePostInputProps> = ({ onPostCreate
           <TouchableOpacity 
             style={styles.removeImageButton}
             onPress={() => setSelectedImage(null)}
+            disabled={isPosting}
           >
             <X size={16} color={colors.white} />
           </TouchableOpacity>
@@ -124,8 +156,9 @@ export const ComposePostInput: React.FC<ComposePostInputProps> = ({ onPostCreate
             placeholderTextColor={colors.textSecondary}
             value={course}
             onChangeText={setCourse}
+            editable={!isPosting}
           />
-          <TouchableOpacity onPress={toggleCourseInput}>
+          <TouchableOpacity onPress={toggleCourseInput} disabled={isPosting}>
             <X size={18} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
@@ -142,6 +175,7 @@ export const ComposePostInput: React.FC<ComposePostInputProps> = ({ onPostCreate
               keyboardType="number-pad"
               value={score}
               onChangeText={setScore}
+              editable={!isPosting}
             />
             <Text style={styles.scoreText}>on par</Text>
             <TextInput
@@ -151,8 +185,9 @@ export const ComposePostInput: React.FC<ComposePostInputProps> = ({ onPostCreate
               keyboardType="number-pad"
               value={par}
               onChangeText={setPar}
+              editable={!isPosting}
             />
-            <TouchableOpacity onPress={toggleScoreInput}>
+            <TouchableOpacity onPress={toggleScoreInput} disabled={isPosting}>
               <X size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -161,31 +196,41 @@ export const ComposePostInput: React.FC<ComposePostInputProps> = ({ onPostCreate
       
       <View style={styles.footer}>
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionButton} onPress={pickImage}>
-            <ImageIcon size={20} color={colors.textSecondary} />
+          <TouchableOpacity 
+            style={[styles.actionButton, isPosting && styles.disabledButton]} 
+            onPress={pickImage}
+            disabled={isPosting}
+          >
+            <ImageIcon size={20} color={isPosting ? colors.textSecondary : colors.textSecondary} />
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.actionButton, showCourseInput && styles.activeAction]} 
+            style={[styles.actionButton, showCourseInput && styles.activeAction, isPosting && styles.disabledButton]} 
             onPress={toggleCourseInput}
+            disabled={isPosting}
           >
             <MapPin size={20} color={showCourseInput ? colors.primary : colors.textSecondary} />
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.actionButton, showScoreInput && styles.activeAction]} 
+            style={[styles.actionButton, showScoreInput && styles.activeAction, isPosting && styles.disabledButton]} 
             onPress={toggleScoreInput}
+            disabled={isPosting}
           >
             <Flag size={20} color={showScoreInput ? colors.primary : colors.textSecondary} />
           </TouchableOpacity>
         </View>
         
         <TouchableOpacity 
-          style={[styles.postButton, !text.trim() && styles.disabledButton]} 
+          style={[styles.postButton, (!text.trim() || isPosting) && styles.disabledButton]} 
           onPress={handlePost}
-          disabled={!text.trim()}
+          disabled={!text.trim() || isPosting}
         >
-          <Text style={styles.postButtonText}>Post</Text>
+          {isPosting ? (
+            <ActivityIndicator color={colors.white} size="small" />
+          ) : (
+            <Text style={styles.postButtonText}>Post</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -254,19 +299,20 @@ const styles = StyleSheet.create({
   },
   additionalInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     color: colors.text,
   },
   scoreInputContainer: {
-    marginBottom: 4,
+    marginBottom: 12,
   },
   scoreInput: {
     width: 60,
-    fontSize: 14,
+    fontSize: 16,
     color: colors.text,
+    textAlign: 'center',
   },
   scoreText: {
-    fontSize: 14,
+    fontSize: 16,
     color: colors.textSecondary,
     marginHorizontal: 8,
   },
@@ -274,31 +320,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 12,
   },
   actions: {
     flexDirection: 'row',
+    gap: 16,
   },
   actionButton: {
-    marginRight: 16,
-    padding: 4,
+    padding: 8,
+    borderRadius: 8,
   },
   activeAction: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: 4,
+    backgroundColor: colors.card,
   },
   postButton: {
     backgroundColor: colors.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-  },
-  disabledButton: {
-    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: 'center',
   },
   postButtonText: {
     color: colors.white,
-    fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
 });

@@ -1,38 +1,63 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { UserCheck, UserPlus } from 'lucide-react-native';
 import { colors } from '@/constants/colors';
 import { useAppStore } from '@/hooks/use-app-store';
+import { User } from '@/types';
 
-export default function FriendsScreen() {
+/**
+ * FriendsScreen Component
+ * Displays a list of friends and suggested users to follow
+ * Features:
+ * - Friend list with follow/unfollow functionality
+ * - Suggested users section
+ * - Profile navigation
+ * - Performance optimized list rendering
+ */
+export default function FriendsScreen(): JSX.Element {
   const { users, currentUser, followUser, unfollowUser } = useAppStore();
   const router = useRouter();
   
   // Get friends of current user
-  const friendIds = currentUser.friends || [];
-  const friends = users.filter(user => friendIds.includes(user.id));
+  const friendIds = useMemo(() => currentUser!.friends || [], [currentUser!.friends]);
+  const friends = useMemo(() => 
+    users.filter(user => friendIds.includes(user.id)),
+    [users, friendIds]
+  );
   
   // Get suggested users (non-friends)
-  const suggestedUsers = users.filter(user => 
-    user.id !== currentUser.id && !friendIds.includes(user.id)
-  ).slice(0, 5); // Limit to 5 suggestions
-  
-  const handleUserPress = (userId: string) => {
-    router.push(`/profile/${userId}`);
-  };
+  const suggestedUsers = useMemo(() => 
+    users
+      .filter(user => user.id !== currentUser!.id && !friendIds.includes(user.id))
+      .slice(0, 5), // Limit to 5 suggestions
+    [users, currentUser!.id, friendIds]
+  );
 
-  const handleFollowPress = (userId: string) => {
+  /**
+   * Handles navigation to user profile
+   */
+  const handleUserPress = useCallback((userId: string) => {
+    router.push(`/profile/${userId}`);
+  }, [router]);
+
+  /**
+   * Handles follow/unfollow action
+   */
+  const handleFollowPress = useCallback((userId: string) => {
     const isFriend = friendIds.includes(userId);
     if (isFriend) {
       unfollowUser(userId);
     } else {
       followUser(userId);
     }
-  };
+  }, [friendIds, followUser, unfollowUser]);
   
-  const renderFriendItem = ({ item }) => (
+  /**
+   * Renders a friend item
+   */
+  const renderFriendItem = useCallback(({ item }: { item: User }) => (
     <TouchableOpacity 
       style={styles.userCard}
       onPress={() => handleUserPress(item.id)}
@@ -50,9 +75,12 @@ export default function FriendsScreen() {
         <UserCheck size={16} color={colors.white} />
       </TouchableOpacity>
     </TouchableOpacity>
-  );
+  ), [handleUserPress, handleFollowPress]);
   
-  const renderSuggestedItem = ({ item }) => (
+  /**
+   * Renders a suggested user item
+   */
+  const renderSuggestedItem = useCallback(({ item }: { item: User }) => (
     <TouchableOpacity 
       style={styles.userCard}
       onPress={() => handleUserPress(item.id)}
@@ -70,47 +98,69 @@ export default function FriendsScreen() {
         <UserPlus size={16} color={colors.white} />
       </TouchableOpacity>
     </TouchableOpacity>
-  );
+  ), [handleUserPress, handleFollowPress]);
+
+  /**
+   * Renders the header component
+   */
+  const renderHeader = useCallback(() => (
+    <View style={styles.header}>
+      <Text style={styles.sectionTitle}>Your Friends</Text>
+      <Text style={styles.sectionSubtitle}>
+        {friends.length} {friends.length === 1 ? 'golfer' : 'golfers'} you follow
+      </Text>
+    </View>
+  ), [friends.length]);
+
+  /**
+   * Renders the empty state component
+   */
+  const renderEmpty = useCallback(() => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyText}>You're not following any golfers yet</Text>
+      <Text style={styles.emptySubtext}>Follow some golfers to see their updates!</Text>
+    </View>
+  ), []);
+
+  /**
+   * Renders the suggested users section
+   */
+  const renderSuggestedSection = useCallback(() => (
+    <>
+      <View style={styles.divider} />
+      <View style={styles.header}>
+        <Text style={styles.sectionTitle}>Suggested Golfers</Text>
+        <Text style={styles.sectionSubtitle}>
+          Players you might want to follow
+        </Text>
+      </View>
+      <FlatList
+        data={suggestedUsers}
+        keyExtractor={(item) => item.id}
+        renderItem={renderSuggestedItem}
+        scrollEnabled={false}
+      />
+    </>
+  ), [renderSuggestedItem, suggestedUsers]);
   
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <FlatList
-        data={friends}
-        keyExtractor={(item) => item.id}
-        renderItem={renderFriendItem}
-        ListHeaderComponent={() => (
-          <View style={styles.header}>
-            <Text style={styles.sectionTitle}>Your Friends</Text>
-            <Text style={styles.sectionSubtitle}>
-              {friends.length} {friends.length === 1 ? 'golfer' : 'golfers'} you follow
-            </Text>
-          </View>
-        )}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>You're not following any golfers yet</Text>
-            <Text style={styles.emptySubtext}>Follow some golfers to see their updates!</Text>
-          </View>
-        )}
-        ListFooterComponent={() => (
-          <>
-            <View style={styles.divider} />
-            <View style={styles.header}>
-              <Text style={styles.sectionTitle}>Suggested Golfers</Text>
-              <Text style={styles.sectionSubtitle}>
-                Players you might want to follow
-              </Text>
-            </View>
-            <FlatList
-              data={suggestedUsers}
-              keyExtractor={(item) => item.id}
-              renderItem={renderSuggestedItem}
-              scrollEnabled={false}
-            />
-          </>
-        )}
-        showsVerticalScrollIndicator={false}
-      />
+      {!currentUser ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={friends}
+          keyExtractor={(item) => item.id}
+          renderItem={renderFriendItem}
+          ListHeaderComponent={renderHeader}
+          ListEmptyComponent={renderEmpty}
+          ListFooterComponent={renderSuggestedSection}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -119,6 +169,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  listContent: {
+    flexGrow: 1,
   },
   header: {
     padding: 16,
@@ -183,6 +236,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   emptyContainer: {
+    flex: 1,
     padding: 40,
     alignItems: 'center',
     justifyContent: 'center',
@@ -202,5 +256,10 @@ const styles = StyleSheet.create({
     height: 8,
     backgroundColor: colors.card,
     marginVertical: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

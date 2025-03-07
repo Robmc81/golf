@@ -1,7 +1,17 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '@/constants/colors';
+import { useAppStore } from '@/hooks/use-app-store';
+
+interface RoundSettings {
+  isCompetitive: boolean;
+  trackPutts: boolean;
+  trackGIR: boolean;
+  trackFairways: boolean;
+  numberOfPlayers: number;
+}
 
 /**
  * RoundSettingsScreen Component
@@ -13,38 +23,64 @@ import { Ionicons } from '@expo/vector-icons';
  * These settings are passed to the active round screen when starting a new round.
  */
 export default function RoundSettingsScreen() {
-  // Initialize router for navigation
   const router = useRouter();
+  const { currentUser } = useAppStore();
+  
   // Get route parameters from previous screen
-  const params = useLocalSearchParams();
+  const params = useLocalSearchParams() as { courseId?: string; courseName?: string };
   
   // State management for round settings
-  const [isCompetitive, setIsCompetitive] = useState(false);
-  const [trackPutts, setTrackPutts] = useState(true);
-  const [trackGIR, setTrackGIR] = useState(true);
-  const [trackFairways, setTrackFairways] = useState(true);
-  const [numberOfPlayers, setNumberOfPlayers] = useState(1);
+  const [settings, setSettings] = useState<RoundSettings>({
+    isCompetitive: false,
+    trackPutts: true,
+    trackGIR: true,
+    trackFairways: true,
+    numberOfPlayers: 1,
+  });
+
+  // Memoize settings update handlers
+  const handleSettingChange = useCallback((key: keyof RoundSettings, value: boolean | number) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  const handlePlayerCountChange = useCallback((increment: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      numberOfPlayers: increment
+        ? Math.min(4, prev.numberOfPlayers + 1)
+        : Math.max(1, prev.numberOfPlayers - 1)
+    }));
+  }, []);
 
   /**
    * Handles starting a new round with selected settings
    * Navigates to active round screen with all settings passed as parameters
    */
-  const handleStartRound = () => {
+  const handleStartRound = useCallback(() => {
+    if (!params.courseId || !params.courseName) return;
+    
     router.push({
-      pathname: '/active-round',
+      pathname: '/active-round' as any,
       params: {
         courseId: params.courseId,
         courseName: params.courseName,
-        settings: JSON.stringify({
-          isCompetitive,
-          trackPutts,
-          trackGIR,
-          trackFairways,
-          numberOfPlayers
-        })
+        settings: JSON.stringify(settings)
       }
-    } as any);
-  };
+    });
+  }, [router, params.courseId, params.courseName, settings]);
+
+  const handleBack = useCallback(() => {
+    router.back();
+  }, [router]);
+
+  // Show loading state when currentUser is not available
+  if (!currentUser) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -52,9 +88,10 @@ export default function RoundSettingsScreen() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleBack}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="chevron-back" size={24} color="#333" />
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.title}>Round Settings</Text>
@@ -70,10 +107,10 @@ export default function RoundSettingsScreen() {
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Competitive Round</Text>
             <Switch
-              value={isCompetitive}
-              onValueChange={setIsCompetitive}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={isCompetitive ? '#4CAF50' : '#f4f3f4'}
+              value={settings.isCompetitive}
+              onValueChange={(value) => handleSettingChange('isCompetitive', value)}
+              trackColor={{ false: colors.border, true: colors.primaryLight }}
+              thumbColor={settings.isCompetitive ? colors.success : colors.background}
             />
           </View>
         </View>
@@ -85,30 +122,30 @@ export default function RoundSettingsScreen() {
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Putts</Text>
             <Switch
-              value={trackPutts}
-              onValueChange={setTrackPutts}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={trackPutts ? '#4CAF50' : '#f4f3f4'}
+              value={settings.trackPutts}
+              onValueChange={(value) => handleSettingChange('trackPutts', value)}
+              trackColor={{ false: colors.border, true: colors.primaryLight }}
+              thumbColor={settings.trackPutts ? colors.success : colors.background}
             />
           </View>
           {/* Greens in Regulation tracking toggle */}
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Greens in Regulation (GIR)</Text>
             <Switch
-              value={trackGIR}
-              onValueChange={setTrackGIR}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={trackGIR ? '#4CAF50' : '#f4f3f4'}
+              value={settings.trackGIR}
+              onValueChange={(value) => handleSettingChange('trackGIR', value)}
+              trackColor={{ false: colors.border, true: colors.primaryLight }}
+              thumbColor={settings.trackGIR ? colors.success : colors.background}
             />
           </View>
           {/* Fairways hit tracking toggle */}
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Fairways Hit</Text>
             <Switch
-              value={trackFairways}
-              onValueChange={setTrackFairways}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={trackFairways ? '#4CAF50' : '#f4f3f4'}
+              value={settings.trackFairways}
+              onValueChange={(value) => handleSettingChange('trackFairways', value)}
+              trackColor={{ false: colors.border, true: colors.primaryLight }}
+              thumbColor={settings.trackFairways ? colors.success : colors.background}
             />
           </View>
         </View>
@@ -120,18 +157,20 @@ export default function RoundSettingsScreen() {
             {/* Decrease player count button */}
             <TouchableOpacity 
               style={styles.playerCountButton}
-              onPress={() => setNumberOfPlayers(Math.max(1, numberOfPlayers - 1))}
+              onPress={() => handlePlayerCountChange(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Ionicons name="remove" size={24} color="#4CAF50" />
+              <Ionicons name="remove" size={24} color={colors.success} />
             </TouchableOpacity>
             {/* Player count display */}
-            <Text style={styles.playerCount}>{numberOfPlayers}</Text>
+            <Text style={styles.playerCount}>{settings.numberOfPlayers}</Text>
             {/* Increase player count button */}
             <TouchableOpacity 
               style={styles.playerCountButton}
-              onPress={() => setNumberOfPlayers(Math.min(4, numberOfPlayers + 1))}
+              onPress={() => handlePlayerCountChange(true)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Ionicons name="add" size={24} color="#4CAF50" />
+              <Ionicons name="add" size={24} color={colors.success} />
             </TouchableOpacity>
           </View>
         </View>
@@ -140,6 +179,7 @@ export default function RoundSettingsScreen() {
         <TouchableOpacity 
           style={styles.startButton}
           onPress={handleStartRound}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={styles.startButtonText}>Start Round</Text>
         </TouchableOpacity>
@@ -148,23 +188,23 @@ export default function RoundSettingsScreen() {
   );
 }
 
-/**
- * Styles for the RoundSettingsScreen component
- * Defines the visual appearance of all UI elements
- */
 const styles = StyleSheet.create({
-  // Container styles
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
-  // Header styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   backButton: {
     padding: 8,
@@ -173,32 +213,30 @@ const styles = StyleSheet.create({
   headerContent: {
     flex: 1,
   },
-  // Text styles
   title: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: colors.text,
     marginBottom: 4,
   },
   courseName: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
   },
-  // Content styles
   content: {
     flex: 1,
   },
-  // Section styles
   section: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: colors.text,
     marginBottom: 16,
   },
-  // Setting row styles
   settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -207,39 +245,38 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: 16,
-    color: '#333',
+    color: colors.text,
   },
-  // Player count styles
   playerCountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
   },
   playerCountButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.card,
     justifyContent: 'center',
     alignItems: 'center',
+    marginHorizontal: 8,
   },
   playerCount: {
     fontSize: 24,
     fontWeight: '600',
+    color: colors.text,
     minWidth: 40,
     textAlign: 'center',
   },
-  // Start button styles
   startButton: {
     margin: 16,
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.success,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
   },
   startButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 18,
     fontWeight: '600',
   },

@@ -1,7 +1,36 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '@/constants/colors';
+import { useAppStore } from '@/hooks/use-app-store';
+
+interface Round {
+  date: string;
+  score: number;
+  putts: number;
+  gir: number;
+  fairways: number;
+}
+
+interface FriendStats {
+  name: string;
+  averageScore: number;
+  roundsPlayed: number;
+}
+
+interface CourseStats {
+  averageScore: number;
+  bestScore: number;
+  roundsPlayed: number;
+  averagePutts: number;
+  averageGIR: number;
+  averageFairways: number;
+  recentRounds: Round[];
+  friendsStats: FriendStats[];
+}
+
+type TimeRange = 'week' | 'month' | 'year';
 
 /**
  * Mock data structure for course statistics
@@ -12,7 +41,7 @@ import { Ionicons } from '@expo/vector-icons';
  * 
  * Note: This should be replaced with actual API data in production
  */
-const mockStats = {
+const mockStats: CourseStats = {
   averageScore: 75,
   bestScore: 68,
   roundsPlayed: 12,
@@ -40,24 +69,52 @@ const mockStats = {
  * - Time-based filtering options
  */
 export default function CourseStatsScreen() {
-  // Initialize router for navigation
   const router = useRouter();
+  const { currentUser } = useAppStore();
+  
   // Get route parameters from previous screen
-  const params = useLocalSearchParams();
+  const params = useLocalSearchParams<{
+    courseId: string;
+    courseName: string;
+  }>();
+
   // State for time range filter
-  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('month');
+  const [timeRange, setTimeRange] = useState<TimeRange>('month');
 
   /**
    * Formats date string into localized display format
    * @param dateString - ISO date string to format
    * @returns Formatted date string (e.g., "Mar 15")
    */
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
     });
-  };
+  }, []);
+
+  const handleBack = useCallback(() => {
+    router.back();
+  }, [router]);
+
+  const handleTimeRangeChange = useCallback((range: TimeRange) => {
+    setTimeRange(range);
+  }, []);
+
+  // Memoize filtered stats based on time range
+  const filteredStats = useMemo(() => {
+    // TODO: Implement actual filtering based on time range
+    return mockStats;
+  }, [timeRange]);
+
+  // Show loading state when currentUser is not available
+  if (!currentUser) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -65,9 +122,10 @@ export default function CourseStatsScreen() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleBack}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="chevron-back" size={24} color="#333" />
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.title}>Course Statistics</Text>
@@ -81,19 +139,22 @@ export default function CourseStatsScreen() {
         <View style={styles.timeRangeContainer}>
           <TouchableOpacity 
             style={[styles.timeRangeButton, timeRange === 'week' && styles.activeTimeRange]}
-            onPress={() => setTimeRange('week')}
+            onPress={() => handleTimeRangeChange('week')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text style={[styles.timeRangeText, timeRange === 'week' && styles.activeTimeRangeText]}>Week</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.timeRangeButton, timeRange === 'month' && styles.activeTimeRange]}
-            onPress={() => setTimeRange('month')}
+            onPress={() => handleTimeRangeChange('month')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text style={[styles.timeRangeText, timeRange === 'month' && styles.activeTimeRangeText]}>Month</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.timeRangeButton, timeRange === 'year' && styles.activeTimeRange]}
-            onPress={() => setTimeRange('year')}
+            onPress={() => handleTimeRangeChange('year')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text style={[styles.timeRangeText, timeRange === 'year' && styles.activeTimeRangeText]}>Year</Text>
           </TouchableOpacity>
@@ -102,19 +163,19 @@ export default function CourseStatsScreen() {
         {/* Key statistics grid */}
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{mockStats.averageScore}</Text>
+            <Text style={styles.statValue}>{filteredStats.averageScore}</Text>
             <Text style={styles.statLabel}>Avg Score</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{mockStats.bestScore}</Text>
+            <Text style={styles.statValue}>{filteredStats.bestScore}</Text>
             <Text style={styles.statLabel}>Best Score</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{mockStats.roundsPlayed}</Text>
+            <Text style={styles.statValue}>{filteredStats.roundsPlayed}</Text>
             <Text style={styles.statLabel}>Rounds</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{mockStats.averagePutts}</Text>
+            <Text style={styles.statValue}>{filteredStats.averagePutts}</Text>
             <Text style={styles.statLabel}>Avg Putts</Text>
           </View>
         </View>
@@ -122,7 +183,7 @@ export default function CourseStatsScreen() {
         {/* Recent rounds section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Rounds</Text>
-          {mockStats.recentRounds.map((round, index) => (
+          {filteredStats.recentRounds.map((round, index) => (
             <View key={index} style={styles.roundRow}>
               <Text style={styles.roundDate}>{formatDate(round.date)}</Text>
               <View style={styles.roundStats}>
@@ -138,7 +199,7 @@ export default function CourseStatsScreen() {
         {/* Friends' performance section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Friends' Performance</Text>
-          {mockStats.friendsStats.map((friend, index) => (
+          {filteredStats.friendsStats.map((friend, index) => (
             <View key={index} style={styles.friendRow}>
               <Text style={styles.friendName}>{friend.name}</Text>
               <View style={styles.friendStats}>
@@ -153,23 +214,23 @@ export default function CourseStatsScreen() {
   );
 }
 
-/**
- * Styles for the CourseStatsScreen component
- * Defines the visual appearance of all UI elements
- */
 const styles = StyleSheet.create({
-  // Container styles
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
-  // Header styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   backButton: {
     padding: 8,
@@ -178,21 +239,19 @@ const styles = StyleSheet.create({
   headerContent: {
     flex: 1,
   },
-  // Text styles
   title: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: colors.text,
     marginBottom: 4,
   },
   courseName: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
   },
-  // Content styles
   content: {
     flex: 1,
   },
-  // Time range filter styles
   timeRangeContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -203,18 +262,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.card,
   },
   activeTimeRange: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.success,
   },
   timeRangeText: {
-    color: '#666',
+    color: colors.textSecondary,
   },
   activeTimeRangeText: {
-    color: '#fff',
+    color: colors.white,
   },
-  // Stats grid styles
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -224,7 +282,7 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.card,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -232,62 +290,62 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: colors.success,
   },
   statLabel: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     marginTop: 4,
   },
-  // Section styles
   section: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: colors.border,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: colors.text,
     marginBottom: 16,
   },
-  // Round row styles
   roundRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   roundDate: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    color: colors.text,
+    width: 80,
   },
   roundStats: {
+    flex: 1,
     alignItems: 'flex-end',
   },
   roundScore: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#4CAF50',
+    color: colors.text,
+    marginBottom: 4,
   },
   roundDetail: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
   },
-  // Friend row styles
   friendRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   friendName: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    color: colors.text,
   },
   friendStats: {
     alignItems: 'flex-end',

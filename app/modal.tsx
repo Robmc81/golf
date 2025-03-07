@@ -1,8 +1,10 @@
 import { StatusBar } from "expo-status-bar";
-import { Platform, StyleSheet, Text, View, TouchableOpacity, FlatList, Image } from "react-native";
+import { Platform, StyleSheet, Text, View, TouchableOpacity, FlatList, Image, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { FontAwesome } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
+import { useAppStore } from '@/hooks/use-app-store';
+import { useCallback, useMemo } from "react";
 
 /**
  * Interface defining the structure of a golf course
@@ -84,21 +86,46 @@ const golfCourses: GolfCourse[] = [
  * - Navigation options
  */
 export default function ModalScreen() {
-  // Initialize router for navigation
   const router = useRouter();
+  const { currentUser } = useAppStore();
+
+  // Memoize recent courses
+  const recentCourses = useMemo(() => golfCourses.slice(0, 3), []);
+
+  // Memoize callback functions
+  const handleBack = useCallback(() => {
+    router.back();
+  }, [router]);
+
+  const handlePlayGolf = useCallback(() => {
+    router.push('/(tabs)/golf-courses' as const);
+  }, [router]);
+
+  const handleCoursePress = useCallback((course: GolfCourse) => {
+    router.push({
+      pathname: '/course-details',
+      params: {
+        id: course.id,
+        name: course.name,
+        location: course.location,
+        rating: course.rating.toString(),
+        price: course.price,
+        description: course.description,
+        image: course.image
+      }
+    });
+  }, [router]);
 
   /**
    * Renders a single golf course item in the list
    * @param item - The golf course data to render
    * @returns A TouchableOpacity component displaying course information
    */
-  const renderCourseItem = ({ item }: { item: GolfCourse }) => (
+  const renderCourseItem = useCallback(({ item }: { item: GolfCourse }) => (
     <TouchableOpacity 
       style={styles.courseCard}
-      onPress={() => {
-        // Navigate to course details (to be implemented)
-        console.log('Selected course:', item.name);
-      }}
+      onPress={() => handleCoursePress(item)}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
     >
       <View style={styles.courseInfo}>
         <Text style={styles.courseName}>{item.name}</Text>
@@ -106,14 +133,25 @@ export default function ModalScreen() {
         <Text style={styles.courseDescription}>{item.description}</Text>
         <View style={styles.courseDetails}>
           <View style={styles.ratingContainer}>
-            <FontAwesome name="star" size={16} color="#FFD700" />
+            <FontAwesome name="star" size={16} color={colors.warning} />
             <Text style={styles.rating}>{item.rating}</Text>
           </View>
           <Text style={styles.price}>{item.price}</Text>
         </View>
       </View>
     </TouchableOpacity>
-  );
+  ), [handleCoursePress]);
+
+  const keyExtractor = useCallback((item: GolfCourse) => item.id, []);
+
+  // Show loading state when currentUser is not available
+  if (!currentUser) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -121,7 +159,8 @@ export default function ModalScreen() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleBack}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <FontAwesome name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
@@ -133,10 +172,8 @@ export default function ModalScreen() {
         {/* Quick start button */}
         <TouchableOpacity 
           style={styles.playButton}
-          onPress={() => {
-            // Navigate to golf courses list
-            router.push('/golf-courses' as any);
-          }}
+          onPress={handlePlayGolf}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <FontAwesome name="play-circle" size={24} color={colors.white} style={styles.playIcon} />
           <Text style={styles.playButtonText}>Play Golf</Text>
@@ -148,10 +185,15 @@ export default function ModalScreen() {
         {/* Recent courses section */}
         <Text style={styles.sectionTitle}>Recent Courses</Text>
         <FlatList
-          data={golfCourses.slice(0, 3)}
+          data={recentCourses}
           renderItem={renderCourseItem}
-          keyExtractor={item => item.id}
+          keyExtractor={keyExtractor}
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No recent courses</Text>
+            </View>
+          }
         />
       </View>
 
@@ -169,6 +211,12 @@ const styles = StyleSheet.create({
   // Container styles
   container: {
     flex: 1,
+    backgroundColor: colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: colors.background,
   },
   // Header styles
@@ -260,10 +308,21 @@ const styles = StyleSheet.create({
   rating: {
     marginLeft: 4,
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.text,
   },
   price: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });

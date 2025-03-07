@@ -1,12 +1,14 @@
 import { Stack } from 'expo-router';
 import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { useColorScheme } from 'react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import { AuthGuard } from '@/components/auth-guard';
 import { colors } from '@/constants/colors';
 import { useAuth, AuthProvider } from '@/lib/auth';
+import { useAppStore } from '@/hooks/use-app-store';
+import { Platform } from 'react-native';
 
 /**
  * Error Boundary export for handling layout-level errors
@@ -27,71 +29,72 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync();
 
 /**
- * RootLayout Component
- * Main application layout that handles:
- * - Theme management (light/dark mode)
- * - Authentication state
- * - Navigation structure
- * - Resource loading (fonts, etc.)
- * - Splash screen management
+ * Custom hook for loading app resources
+ * @returns boolean indicating if all resources are loaded
  */
-export default function RootLayout() {
-  // State management for app initialization
+const useAppResources = (): boolean => {
   const [isReady, setIsReady] = useState(false);
-  // Get system color scheme for theme management
-  const colorScheme = useColorScheme();
-  // Get authentication loading state
-  const { isLoading: isAuthLoading } = useAuth();
-  // Load custom fonts
   const [fontsLoaded] = useFonts({
     // Add your required fonts here
   });
 
-  /**
-   * Initialize app resources and configurations
-   * Runs once when component mounts
-   */
-  useEffect(() => {
-    async function prepare() {
-      try {
-        // Add any additional async initialization here
-        await Promise.all([
-          // Add other initialization promises here
-        ]);
-      } catch (e) {
-        console.warn('Error during initialization:', e);
-      } finally {
-        setIsReady(true);
-      }
+  const prepare = useCallback(async () => {
+    try {
+      // Add any additional async initialization here
+      await Promise.all([
+        // Add other initialization promises here
+      ]);
+    } catch (error) {
+      console.error('Error during initialization:', error);
+      // You might want to show an error screen here
+    } finally {
+      setIsReady(true);
     }
-
-    prepare();
   }, []);
 
-  /**
-   * Handle splash screen visibility
-   * Hides splash screen when all resources are loaded
-   */
   useEffect(() => {
-    if (isReady && !isAuthLoading && fontsLoaded) {
-      SplashScreen.hideAsync().catch(console.warn);
+    prepare();
+  }, [prepare]);
+
+  return isReady && fontsLoaded;
+};
+
+/**
+ * AppContent Component
+ * Handles the main app content and navigation
+ */
+function AppContent() {
+  const colorScheme = useColorScheme();
+  const resourcesLoaded = useAppResources();
+  const { user } = useAuth();
+  const { logout } = useAppStore();
+
+  // Handle splash screen visibility
+  useEffect(() => {
+    if (resourcesLoaded) {
+      SplashScreen.hideAsync().catch((error) => {
+        console.error('Error hiding splash screen:', error);
+      });
     }
-  }, [isReady, isAuthLoading, fontsLoaded]);
+  }, [resourcesLoaded]);
 
   // Show nothing while resources are loading
-  if (!isReady || !fontsLoaded || isAuthLoading) {
+  if (!resourcesLoaded) {
     return null;
   }
 
   return (
-    // Theme provider for light/dark mode support
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      {/* Authentication context provider */}
-      <AuthProvider>
-        {/* Guard component for protected routes */}
-        <AuthGuard />
-        {/* Main navigation stack */}
-        <Stack screenOptions={{ headerShown: false }}>
+      <AuthGuard>
+        <Stack 
+          screenOptions={{ 
+            headerShown: false,
+            animation: Platform.OS === 'ios' ? 'default' : 'fade',
+            animationDuration: 200,
+            gestureEnabled: true,
+            gestureDirection: 'horizontal',
+          }}
+        >
           {/* Authentication routes */}
           <Stack.Screen name="(auth)" />
           {/* Main app tabs */}
@@ -101,7 +104,8 @@ export default function RootLayout() {
             name="modal" 
             options={{ 
               presentation: 'modal',
-              headerShown: true 
+              headerShown: true,
+              animation: 'slide_from_bottom',
             }} 
           />
           {/* Dynamic routes for posts and profiles */}
@@ -118,8 +122,46 @@ export default function RootLayout() {
               headerTintColor: colors.text,
             }}
           />
+          {/* Round settings and active round screens */}
+          <Stack.Screen
+            name="round-settings"
+            options={{
+              title: 'Round Settings',
+              headerStyle: {
+                backgroundColor: colors.background,
+              },
+              headerTintColor: colors.text,
+            }}
+          />
+          <Stack.Screen
+            name="active-round"
+            options={{
+              title: 'Active Round',
+              headerStyle: {
+                backgroundColor: colors.background,
+              },
+              headerTintColor: colors.text,
+            }}
+          />
         </Stack>
-      </AuthProvider>
+      </AuthGuard>
     </ThemeProvider>
+  );
+}
+
+/**
+ * RootLayout Component
+ * Main application layout that handles:
+ * - Theme management (light/dark mode)
+ * - Authentication state
+ * - Navigation structure
+ * - Resource loading (fonts, etc.)
+ * - Splash screen management
+ */
+export default function RootLayout(): JSX.Element {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
