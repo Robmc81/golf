@@ -3,7 +3,15 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } fr
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-// Mock data for course statistics
+/**
+ * Mock data structure for course statistics
+ * Contains:
+ * - Overall performance metrics
+ * - Recent round history
+ * - Friends' performance data
+ * 
+ * Note: This should be replaced with actual API data in production
+ */
 const mockStats = {
   averageScore: 75,
   bestScore: 68,
@@ -23,11 +31,27 @@ const mockStats = {
   ],
 };
 
+/**
+ * CourseStatsScreen Component
+ * Displays comprehensive statistics for a specific golf course including:
+ * - Overall performance metrics
+ * - Recent round history
+ * - Friends' performance
+ * - Time-based filtering options
+ */
 export default function CourseStatsScreen() {
+  // Initialize router for navigation
   const router = useRouter();
+  // Get route parameters from previous screen
   const params = useLocalSearchParams();
+  // State for time range filter
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('month');
 
+  /**
+   * Formats date string into localized display format
+   * @param dateString - ISO date string to format
+   * @returns Formatted date string (e.g., "Mar 15")
+   */
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -37,6 +61,7 @@ export default function CourseStatsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header section with back button and course info */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
@@ -50,7 +75,9 @@ export default function CourseStatsScreen() {
         </View>
       </View>
 
+      {/* Scrollable content area */}
       <ScrollView style={styles.content}>
+        {/* Time range filter buttons */}
         <View style={styles.timeRangeContainer}>
           <TouchableOpacity 
             style={[styles.timeRangeButton, timeRange === 'week' && styles.activeTimeRange]}
@@ -72,6 +99,7 @@ export default function CourseStatsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Key statistics grid */}
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{mockStats.averageScore}</Text>
@@ -91,6 +119,7 @@ export default function CourseStatsScreen() {
           </View>
         </View>
 
+        {/* Recent rounds section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Rounds</Text>
           {mockStats.recentRounds.map((round, index) => (
@@ -106,6 +135,7 @@ export default function CourseStatsScreen() {
           ))}
         </View>
 
+        {/* Friends' performance section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Friends' Performance</Text>
           {mockStats.friendsStats.map((friend, index) => (
@@ -123,11 +153,17 @@ export default function CourseStatsScreen() {
   );
 }
 
+/**
+ * Styles for the CourseStatsScreen component
+ * Defines the visual appearance of all UI elements
+ */
 const styles = StyleSheet.create({
+  // Container styles
   container: {
     flex: 1,
     backgroundColor: '#fff',
   },
+  // Header styles
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -142,6 +178,7 @@ const styles = StyleSheet.create({
   headerContent: {
     flex: 1,
   },
+  // Text styles
   title: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -151,9 +188,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
+  // Content styles
   content: {
     flex: 1,
   },
+  // Time range filter styles
   timeRangeContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -175,6 +214,7 @@ const styles = StyleSheet.create({
   activeTimeRangeText: {
     color: '#fff',
   },
+  // Stats grid styles
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -199,6 +239,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
+  // Section styles
   section: {
     padding: 16,
     borderTopWidth: 1,
@@ -209,6 +250,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 16,
   },
+  // Round row styles
   roundRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -233,6 +275,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  // Friend row styles
   friendRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

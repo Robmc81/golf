@@ -1,21 +1,25 @@
 import { useEffect } from 'react';
-import { useRouter, useSegments } from 'expo-router';
-import { useAppStore } from '@/hooks/use-app-store';
+import { Redirect, useSegments } from 'expo-router';
+import { useAuth } from '@/lib/auth';
+import { View } from 'react-native';
 
 export function AuthGuard() {
-  const { isLoggedIn } = useAppStore();
+  const { user, isLoading } = useAuth();
   const segments = useSegments();
-  const router = useRouter();
 
-  useEffect(() => {
-    const inProtectedRoute = segments[0] !== '(auth)';
-    
-    if (!isLoggedIn && inProtectedRoute) {
-      router.replace('/(auth)/login' as any);
-    } else if (isLoggedIn && !inProtectedRoute) {
-      router.replace('/(tabs)' as any);
-    }
-  }, [isLoggedIn, segments]);
+  if (isLoading) {
+    return <View />;
+  }
 
-  return null;
+  const inAuthGroup = segments[0] === '(auth)';
+
+  if (!user && !inAuthGroup) {
+    return <Redirect href="/login" />;
+  }
+
+  if (user && inAuthGroup) {
+    return <Redirect href="/course-details" />;
+  }
+
+  return <View />;
 } 

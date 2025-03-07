@@ -4,6 +4,16 @@ import { useRouter } from "expo-router";
 import { FontAwesome } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
 
+/**
+ * Interface defining the structure of a golf course
+ * @property id - Unique identifier for the course
+ * @property name - Name of the golf course
+ * @property location - Geographic location of the course
+ * @property rating - Course rating (out of 5)
+ * @property price - Price category ($, $$, $$$)
+ * @property image - URL of the course image
+ * @property description - Brief description of the course
+ */
 interface GolfCourse {
   id: string;
   name: string;
@@ -14,7 +24,10 @@ interface GolfCourse {
   description: string;
 }
 
-// Mock data for Atlanta golf courses
+/**
+ * Mock data for Atlanta golf courses
+ * Note: This should be replaced with actual API data in production
+ */
 const golfCourses: GolfCourse[] = [
   {
     id: '1',
@@ -63,9 +76,22 @@ const golfCourses: GolfCourse[] = [
   }
 ];
 
+/**
+ * ModalScreen Component
+ * Displays a modal interface with:
+ * - Quick access to start a new round
+ * - List of recently played courses
+ * - Navigation options
+ */
 export default function ModalScreen() {
+  // Initialize router for navigation
   const router = useRouter();
 
+  /**
+   * Renders a single golf course item in the list
+   * @param item - The golf course data to render
+   * @returns A TouchableOpacity component displaying course information
+   */
   const renderCourseItem = ({ item }: { item: GolfCourse }) => (
     <TouchableOpacity 
       style={styles.courseCard}
@@ -91,6 +117,7 @@ export default function ModalScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Header section with back button */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
@@ -101,7 +128,9 @@ export default function ModalScreen() {
         <Text style={styles.title}>Options</Text>
       </View>
 
+      {/* Main content area */}
       <View style={styles.content}>
+        {/* Quick start button */}
         <TouchableOpacity 
           style={styles.playButton}
           onPress={() => {
@@ -113,8 +142,10 @@ export default function ModalScreen() {
           <Text style={styles.playButtonText}>Play Golf</Text>
         </TouchableOpacity>
 
+        {/* Visual separator */}
         <View style={styles.separator} />
         
+        {/* Recent courses section */}
         <Text style={styles.sectionTitle}>Recent Courses</Text>
         <FlatList
           data={golfCourses.slice(0, 3)}
@@ -124,16 +155,23 @@ export default function ModalScreen() {
         />
       </View>
 
+      {/* Platform-specific status bar */}
       <StatusBar style={Platform.OS === "ios" ? "light" : "auto"} />
     </View>
   );
 }
 
+/**
+ * Styles for the ModalScreen component
+ * Defines the visual appearance of all UI elements
+ */
 const styles = StyleSheet.create({
+  // Container styles
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
+  // Header styles
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -149,10 +187,12 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: colors.text,
   },
+  // Content styles
   content: {
     flex: 1,
     padding: 16,
   },
+  // Play button styles
   playButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -169,17 +209,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  // Separator styles
   separator: {
     height: 1,
     backgroundColor: colors.border,
     marginVertical: 24,
   },
+  // Section title styles
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 16,
   },
+  // Course card styles
   courseCard: {
     backgroundColor: colors.card,
     borderRadius: 12,

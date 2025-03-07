@@ -5,8 +5,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
 import MapView, { Marker } from 'react-native-maps';
 
+/**
+ * CourseDetailsScreen Component
+ * Displays detailed information about a golf course including:
+ * - Course name and location
+ * - Rating and pricing
+ * - Course description
+ * - Interactive map
+ * - Options to start a round or view course statistics
+ */
 export default function CourseDetailsScreen() {
+  // Initialize router for navigation
   const router = useRouter();
+  // Get route parameters with type safety
   const params = useLocalSearchParams<{
     id: string;
     name: string;
@@ -20,6 +31,7 @@ export default function CourseDetailsScreen() {
     image?: string;
   }>();
 
+  // Parse coordinates for map display if available
   const coordinates = params.latitude && params.longitude
     ? {
         latitude: parseFloat(params.latitude),
@@ -27,6 +39,10 @@ export default function CourseDetailsScreen() {
       }
     : undefined;
 
+  /**
+   * Navigate to round settings screen
+   * Passes course information as route parameters
+   */
   const handleStartRound = () => {
     router.push({
       pathname: '/round-settings',
@@ -37,6 +53,10 @@ export default function CourseDetailsScreen() {
     } as any);
   };
 
+  /**
+   * Navigate to course statistics screen
+   * Passes course information as route parameters
+   */
   const handleViewStats = () => {
     router.push({
       pathname: '/course-stats',
@@ -49,6 +69,7 @@ export default function CourseDetailsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header section with back button and course info */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
@@ -62,21 +83,27 @@ export default function CourseDetailsScreen() {
         </View>
       </View>
 
+      {/* Scrollable content area */}
       <ScrollView style={styles.content}>
+        {/* Course image */}
         <Image 
           source={{ uri: params.image as string }} 
           style={styles.image}
         />
         
+        {/* Course information section */}
         <View style={styles.infoContainer}>
+          {/* Rating display */}
           <View style={styles.infoItem}>
             <Ionicons name="star" size={20} color="#FFD700" />
             <Text style={styles.infoText}>{params.rating}</Text>
           </View>
+          {/* Price display */}
           <View style={styles.infoItem}>
             <Ionicons name="cash" size={20} color="#4CAF50" />
             <Text style={styles.infoText}>{params.price}</Text>
           </View>
+          {/* Distance display (if available) */}
           {params.distance && (
             <View style={styles.infoItem}>
               <Ionicons name="navigate" size={20} color="#666" />
@@ -85,14 +112,18 @@ export default function CourseDetailsScreen() {
           )}
         </View>
 
+        {/* Course type information */}
         <View style={styles.typeContainer}>
           <Text style={styles.typeLabel}>Course Type:</Text>
           <Text style={styles.typeValue}>Public</Text>
         </View>
 
+        {/* Course description */}
         <Text style={styles.description}>{params.description}</Text>
 
+        {/* Action buttons */}
         <View style={styles.buttonContainer}>
+          {/* Start round button */}
           <TouchableOpacity 
             style={[styles.button, styles.startRoundButton]}
             onPress={handleStartRound}
@@ -101,6 +132,7 @@ export default function CourseDetailsScreen() {
             <Text style={styles.buttonText}>Start Round</Text>
           </TouchableOpacity>
 
+          {/* View stats button */}
           <TouchableOpacity 
             style={[styles.button, styles.statsButton]}
             onPress={handleViewStats}
@@ -110,6 +142,7 @@ export default function CourseDetailsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Interactive map (if coordinates are available) */}
         {coordinates && (
           <View style={styles.mapContainer}>
             <MapView
@@ -133,11 +166,17 @@ export default function CourseDetailsScreen() {
   );
 }
 
+/**
+ * Styles for the CourseDetailsScreen component
+ * Defines the visual appearance of all UI elements
+ */
 const styles = StyleSheet.create({
+  // Container styles
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
+  // Header styles
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -152,6 +191,7 @@ const styles = StyleSheet.create({
   headerContent: {
     flex: 1,
   },
+  // Text styles
   title: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -162,13 +202,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
   },
+  // Content styles
   content: {
     flex: 1,
   },
+  // Image styles
   image: {
     width: '100%',
     height: 250,
   },
+  // Info container styles
   infoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -188,6 +231,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     color: colors.textSecondary,
   },
+  // Type container styles
   typeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -203,6 +247,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
   },
+  // Description styles
   description: {
     fontSize: 16,
     color: colors.text,
@@ -210,6 +255,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     paddingHorizontal: 16,
   },
+  // Button container styles
   buttonContainer: {
     padding: 16,
     gap: 12,
@@ -238,6 +284,7 @@ const styles = StyleSheet.create({
   statsButtonText: {
     color: colors.primary,
   },
+  // Map styles
   mapContainer: {
     height: 200,
     width: '100%',
