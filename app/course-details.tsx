@@ -1,134 +1,103 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Platform, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '@/constants/colors';
-import MapView, { Marker } from 'react-native-maps';
+import { colors } from './constants/colors';
+import { useCourseDetails } from './hooks/use-course-details';
 
 export default function CourseDetailsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    id: string;
-    name: string;
-    location: string;
-    rating: string;
-    price: string;
-    description: string;
-    distance?: string;
-    latitude?: string;
-    longitude?: string;
-    image?: string;
-  }>();
+  const params = useLocalSearchParams() as { courseId?: string; courseName?: string };
+  const { data: course, isLoading, isError } = useCourseDetails(params.courseId);
 
-  const coordinates = params.latitude && params.longitude
-    ? {
-        latitude: parseFloat(params.latitude),
-        longitude: parseFloat(params.longitude),
-      }
-    : undefined;
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
-  const handleStartRound = () => {
-    router.push({
-      pathname: '/round-settings',
-      params: {
-        courseId: params.id,
-        courseName: params.name
-      }
-    } as any);
-  };
-
-  const handleViewStats = () => {
-    router.push({
-      pathname: '/course-stats',
-      params: {
-        courseId: params.id,
-        courseName: params.name
-      }
-    } as any);
-  };
+  if (isError || !course) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Failed to load course details</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => router.back()}>
+          <Text style={styles.retryText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="chevron-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>{params.name}</Text>
-          <Text style={styles.courseName}>{params.location}</Text>
+      <ScrollView style={styles.content} bounces={false}>
+        <View style={styles.imageContainer}>
+          <Image source={{ uri: course.imageUrl }} style={styles.courseImage} resizeMode="cover" />
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="chevron-back" size={28} color="white" />
+          </TouchableOpacity>
+          <View style={styles.courseNameContainer}>
+            <Text style={styles.courseName}>{course.name}</Text>
+            <Text style={styles.courseLocation}>{course.location}</Text>
+          </View>
         </View>
-      </View>
 
-      <ScrollView style={styles.content}>
-        <Image 
-          source={{ uri: params.image as string }} 
-          style={styles.image}
-        />
-        
-        <View style={styles.infoContainer}>
-          <View style={styles.infoItem}>
-            <Ionicons name="star" size={20} color="#FFD700" />
-            <Text style={styles.infoText}>{params.rating}</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Ionicons name="cash" size={20} color="#4CAF50" />
-            <Text style={styles.infoText}>{params.price}</Text>
-          </View>
-          {params.distance && (
-            <View style={styles.infoItem}>
-              <Ionicons name="navigate" size={20} color="#666" />
-              <Text style={styles.infoText}>{params.distance} km away</Text>
+        <View style={styles.detailsContainer}>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>HOLES</Text>
+              <Text style={styles.statValue}>{course.holes}</Text>
             </View>
-          )}
-        </View>
-
-        <View style={styles.typeContainer}>
-          <Text style={styles.typeLabel}>Course Type:</Text>
-          <Text style={styles.typeValue}>Public</Text>
-        </View>
-
-        <Text style={styles.description}>{params.description}</Text>
-
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={[styles.button, styles.startRoundButton]}
-            onPress={handleStartRound}
-          >
-            <Ionicons name="play-circle" size={24} color="#fff" />
-            <Text style={styles.buttonText}>Start Round</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.button, styles.statsButton]}
-            onPress={handleViewStats}
-          >
-            <Ionicons name="stats-chart" size={24} color="#4CAF50" />
-            <Text style={[styles.buttonText, styles.statsButtonText]}>Course Stats</Text>
-          </TouchableOpacity>
-        </View>
-
-        {coordinates && (
-          <View style={styles.mapContainer}>
-            <MapView
-              style={styles.map}
-              initialRegion={{
-                ...coordinates,
-                latitudeDelta: 0.0922,
-                longitudeDelta: 0.0421,
-              }}
-              scrollEnabled={false}
-            >
-              <Marker
-                coordinate={coordinates}
-                title={params.name}
-              />
-            </MapView>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>PAR</Text>
+              <Text style={styles.statValue}>{course.par}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>DIFFICULTY</Text>
+              <Text style={styles.statValue}>{course.difficulty}/5</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>PRICE</Text>
+              <Text style={styles.statValue}>{course.price}</Text>
+            </View>
           </View>
-        )}
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>About</Text>
+            <Text style={styles.sectionText}>{course.description || 'No description available.'}</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Location</Text>
+            <Text style={styles.sectionText}>{course.location}</Text>
+          </View>
+        </View>
       </ScrollView>
+
+      <View style={styles.actionContainer}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.secondaryButton]}
+          onPress={() => router.push(`/course-stats?courseId=${course._id}`)}
+        >
+          <Ionicons name="stats-chart" size={24} color={colors.primary} />
+          <Text style={styles.secondaryButtonText}>Course Stats</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.primaryButton]}
+          onPress={() => router.push(`/round-settings?courseId=${course._id}&courseName=${course.name}`)}
+        >
+          <Ionicons name="golf" size={24} color={colors.white} />
+          <Text style={styles.primaryButtonText}>Start Round</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -138,112 +107,173 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    padding: 8,
-    marginRight: 8,
-  },
-  headerContent: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  courseName: {
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
   content: {
     flex: 1,
   },
-  image: {
-    width: '100%',
-    height: 250,
-  },
-  infoContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: colors.border,
-  },
-  infoItem: {
-    flexDirection: 'row',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.background,
   },
-  infoText: {
-    fontSize: 16,
-    marginLeft: 4,
-    color: colors.textSecondary,
-  },
-  typeContainer: {
-    flexDirection: 'row',
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 16,
+    backgroundColor: colors.background,
+    padding: 16,
   },
-  typeLabel: {
+  errorText: {
     fontSize: 16,
+    color: colors.error,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: colors.white,
+    fontSize: 14,
     fontWeight: '600',
-    marginRight: 8,
   },
-  typeValue: {
+  imageContainer: {
+    height: 300,
+    position: 'relative',
+  },
+  courseImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.border,
+  },
+  backButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 44 : 16,
+    left: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  courseNameContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  courseName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.white,
+    marginBottom: 4,
+  },
+  courseLocation: {
     fontSize: 16,
-    color: colors.textSecondary,
+    color: colors.white,
+    opacity: 0.9,
   },
-  description: {
+  detailsContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    marginTop: -20,
+    padding: 20,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statDivider: {
+    width: 1,
+    height: '100%',
+    backgroundColor: colors.border,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  statValue: {
     fontSize: 16,
     color: colors.text,
-    lineHeight: 24,
-    marginBottom: 24,
-    paddingHorizontal: 16,
+    fontWeight: '600',
   },
-  buttonContainer: {
-    padding: 16,
-    gap: 12,
+  section: {
+    marginBottom: 20,
   },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 8,
-    gap: 8,
-  },
-  startRoundButton: {
-    backgroundColor: colors.primary,
-  },
-  statsButton: {
-    backgroundColor: colors.background,
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  buttonText: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.text,
+    marginBottom: 8,
   },
-  statsButtonText: {
-    color: colors.primary,
+  sectionText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    lineHeight: 24,
   },
-  mapContainer: {
-    height: 200,
-    width: '100%',
-    marginTop: 16,
+  actionContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    backgroundColor: colors.card,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  map: {
+  actionButton: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginHorizontal: 6,
+  },
+  primaryButton: {
+    backgroundColor: colors.primary,
+  },
+  secondaryButton: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  primaryButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  secondaryButtonText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 }); 
