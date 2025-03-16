@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   },
   courseNameContainer: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 20,
     left: 0,
     right: 0,
     padding: 16,
@@ -184,7 +184,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    marginTop: -20,
     padding: 20,
   },
   statsContainer: {
