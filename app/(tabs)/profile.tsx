@@ -8,6 +8,9 @@ import { colors } from '@/constants/colors';
 
 export default function ProfileScreen() {
   const { currentUser, getPostsByUserId } = useAppStore();
+  
+  if (!currentUser) return null;
+  
   const userPosts = getPostsByUserId(currentUser.id);
 
   return (

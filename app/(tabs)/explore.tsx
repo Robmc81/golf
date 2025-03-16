@@ -35,7 +35,7 @@ export default function ExploreScreen() {
       )
     : [];
 
-  const handleUserPress = (userId) => {
+  const handleUserPress = (userId: string) => {
     router.push(`/profile/${userId}`);
   };
 

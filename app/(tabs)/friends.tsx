@@ -6,9 +6,19 @@ import { UserCheck, UserPlus } from 'lucide-react-native';
 import { colors } from '@/constants/colors';
 import { useAppStore } from '@/hooks/use-app-store';
 
+interface User {
+  id: string;
+  name: string;
+  username: string;
+  bio: string;
+  avatar: string;
+}
+
 export default function FriendsScreen() {
   const { users, currentUser, followUser, unfollowUser } = useAppStore();
   const router = useRouter();
+  
+  if (!currentUser) return null;
   
   // Get friends of current user
   const friendIds = currentUser.friends || [];
@@ -32,7 +42,7 @@ export default function FriendsScreen() {
     }
   };
   
-  const renderFriendItem = ({ item }) => (
+  const renderFriendItem = ({ item }: { item: User }) => (
     <TouchableOpacity 
       style={styles.userCard}
       onPress={() => handleUserPress(item.id)}
@@ -52,7 +62,7 @@ export default function FriendsScreen() {
     </TouchableOpacity>
   );
   
-  const renderSuggestedItem = ({ item }) => (
+  const renderSuggestedItem = ({ item }: { item: User }) => (
     <TouchableOpacity 
       style={styles.userCard}
       onPress={() => handleUserPress(item.id)}
