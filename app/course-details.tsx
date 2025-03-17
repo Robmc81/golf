@@ -1,16 +1,143 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Platform, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from './constants/colors';
-import { useCourseDetails } from './hooks/use-course-details';
+import { colors } from '../constants/colors';
+import { useCourseDetails, type Course } from './hooks/use-course-details';
+import { useAppStore } from './hooks/use-app-store';
+import { format } from 'date-fns';
+
+interface CourseParams {
+  courseId?: string;
+  courseName?: string;
+}
 
 export default function CourseDetailsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams() as { courseId?: string; courseName?: string };
+  const params = useLocalSearchParams() as CourseParams;
   const { data: course, isLoading, isError } = useCourseDetails(params.courseId);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const { 
+    isFavoriteCourse, 
+    addFavoriteCourse, 
+    removeFavoriteCourse, 
+    loadFavoriteCourses,
+    getCourseStats,
+    loadRounds,
+    rounds
+  } = useAppStore();
 
-  if (isLoading) {
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        setIsLoadingData(true);
+        console.log('Starting data initialization...');
+        console.log('Course ID from params:', params.courseId);
+        
+        await Promise.all([loadFavoriteCourses(), loadRounds()]);
+        
+        console.log('Data loaded successfully:');
+        console.log('- Total rounds:', rounds.length);
+        if (course) {
+          console.log('- Course ID:', course._id);
+          const stats = getCourseStats(course._id);
+          console.log('- Course stats:', stats);
+        }
+      } catch (error) {
+        console.error('Error initializing data:', error);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    initializeData();
+  }, [course, params.courseId]);
+
+  const toggleFavorite = () => {
+    if (!course) return;
+    if (isFavoriteCourse(course._id)) {
+      removeFavoriteCourse(course._id);
+    } else {
+      addFavoriteCourse(course._id);
+    }
+  };
+
+  const renderCourseStats = () => {
+    if (!course) {
+      console.log('No course data available');
+      return null;
+    }
+    
+    console.log('Getting stats for course:', course._id);
+    const stats = getCourseStats(course._id);
+    console.log('Course stats:', stats);
+    
+    if (stats.roundsPlayed === 0) {
+      console.log('No rounds played for this course');
+      return (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Course Stats</Text>
+          <Text style={styles.noStatsText}>You haven't played any rounds at this course yet.</Text>
+          <TouchableOpacity 
+            style={styles.startRoundButton}
+            onPress={() => router.push(`/round-settings?courseId=${course._id}&courseName=${course.name}`)}
+          >
+            <Text style={styles.startRoundButtonText}>Start Your First Round</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Course Stats</Text>
+        <View style={styles.statsGrid}>
+          <View style={styles.statGridItem}>
+            <Text style={styles.statGridValue}>{stats.roundsPlayed}</Text>
+            <Text style={styles.statGridLabel}>Rounds Played</Text>
+          </View>
+          <View style={styles.statGridItem}>
+            <Text style={styles.statGridValue}>{stats.averageScore}</Text>
+            <Text style={styles.statGridLabel}>Avg Score</Text>
+          </View>
+          <View style={styles.statGridItem}>
+            <Text style={styles.statGridValue}>{stats.bestScore}</Text>
+            <Text style={styles.statGridLabel}>Best Score</Text>
+          </View>
+        </View>
+
+        {stats.lastRound && (
+          <View style={styles.lastRoundContainer}>
+            <Text style={styles.lastRoundTitle}>Last Round</Text>
+            <View style={styles.lastRoundStats}>
+              <View style={styles.lastRoundStat}>
+                <Text style={styles.lastRoundLabel}>Date</Text>
+                <Text style={styles.lastRoundValue}>
+                  {format(new Date(stats.lastRound.date), 'MMM d, yyyy')}
+                </Text>
+              </View>
+              <View style={styles.lastRoundStat}>
+                <Text style={styles.lastRoundLabel}>Score</Text>
+                <Text style={styles.lastRoundValue}>{stats.lastRound.score}</Text>
+              </View>
+              <View style={styles.lastRoundStat}>
+                <Text style={styles.lastRoundLabel}>vs Par</Text>
+                <Text style={[
+                  styles.lastRoundValue,
+                  { color: stats.lastRound.score > stats.lastRound.par ? colors.error : colors.success }
+                ]}>
+                  {stats.lastRound.score > stats.lastRound.par ? '+' : ''}
+                  {stats.lastRound.score - stats.lastRound.par}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  if (isLoading || isLoadingData) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -40,6 +167,17 @@ export default function CourseDetailsScreen() {
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="chevron-back" size={28} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.favoriteButton} 
+            onPress={toggleFavorite}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons 
+              name={isFavoriteCourse(course._id) ? "heart" : "heart-outline"} 
+              size={28} 
+              color={isFavoriteCourse(course._id) ? colors.primary : "white"} 
+            />
           </TouchableOpacity>
           <View style={styles.courseNameContainer}>
             <Text style={styles.courseName}>{course.name}</Text>
@@ -79,16 +217,27 @@ export default function CourseDetailsScreen() {
             <Text style={styles.sectionTitle}>Location</Text>
             <Text style={styles.sectionText}>{course.location}</Text>
           </View>
+
+          {renderCourseStats()}
         </View>
       </ScrollView>
 
       <View style={styles.actionContainer}>
         <TouchableOpacity 
-          style={[styles.actionButton, styles.secondaryButton]}
-          onPress={() => router.push(`/course-stats?courseId=${course._id}`)}
+          style={[styles.actionButton, styles.myCourseButton]}
+          onPress={toggleFavorite}
         >
-          <Ionicons name="stats-chart" size={24} color={colors.primary} />
-          <Text style={styles.secondaryButtonText}>Course Stats</Text>
+          <Ionicons 
+            name={isFavoriteCourse(course._id) ? "heart" : "heart-outline"} 
+            size={24} 
+            color={isFavoriteCourse(course._id) ? colors.white : colors.primary} 
+          />
+          <Text style={[
+            styles.myCourseButtonText,
+            isFavoriteCourse(course._id) && styles.myCourseButtonTextActive
+          ]}>
+            {isFavoriteCourse(course._id) ? 'My Course' : 'Add to My Courses'}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.actionButton, styles.primaryButton]}
@@ -141,49 +290,45 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   imageContainer: {
-    height: 300,
+    height: 250,
     position: 'relative',
   },
   courseImage: {
     width: '100%',
     height: '100%',
-    backgroundColor: colors.border,
   },
   backButton: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 44 : 16,
-    left: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    left: 20,
+    zIndex: 1,
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    right: 20,
+    zIndex: 1,
   },
   courseNameContainer: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 0,
     left: 0,
     right: 0,
-    padding: 16,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    padding: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   courseName: {
+    color: colors.white,
     fontSize: 24,
     fontWeight: 'bold',
-    color: colors.white,
-    marginBottom: 4,
   },
   courseLocation: {
-    fontSize: 16,
     color: colors.white,
-    opacity: 0.9,
+    fontSize: 16,
+    marginTop: 4,
   },
   detailsContainer: {
     flex: 1,
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
     padding: 20,
   },
   statsContainer: {
@@ -192,17 +337,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   statItem: {
     flex: 1,
@@ -210,38 +349,44 @@ const styles = StyleSheet.create({
   },
   statDivider: {
     width: 1,
-    height: '100%',
     backgroundColor: colors.border,
+    marginHorizontal: 8,
   },
   statLabel: {
     fontSize: 12,
     color: colors.textSecondary,
     marginBottom: 4,
-    fontWeight: '500',
   },
   statValue: {
     fontSize: 16,
+    fontWeight: 'bold',
     color: colors.text,
-    fontWeight: '600',
   },
   section: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   sectionText: {
     fontSize: 16,
-    color: colors.textSecondary,
+    color: colors.text,
     lineHeight: 24,
   },
   actionContainer: {
     flexDirection: 'row',
     padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
     backgroundColor: colors.card,
     borderTopWidth: 1,
     borderTopColor: colors.border,
@@ -253,26 +398,95 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: 8,
-    marginHorizontal: 6,
   },
-  primaryButton: {
-    backgroundColor: colors.primary,
-  },
-  secondaryButton: {
+  myCourseButton: {
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.primary,
+    marginRight: 8,
+  },
+  primaryButton: {
+    backgroundColor: colors.primary,
+    marginLeft: 8,
+  },
+  myCourseButtonText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: colors.primary,
+  },
+  myCourseButtonTextActive: {
+    color: colors.white,
   },
   primaryButtonText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: colors.white,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  statGridItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statGridValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  statGridLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  lastRoundContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  lastRoundTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  lastRoundStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  lastRoundStat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  lastRoundLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  lastRoundValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  noStatsText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  startRoundButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  startRoundButtonText: {
     color: colors.white,
     fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  secondaryButtonText: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+    fontWeight: 'bold',
   },
 }); 

@@ -49,11 +49,17 @@ const headers = {
 };
 
 function processWebflowCourse(id: string, fieldData: WebflowFieldData): WebflowCourse {
+  const imageUrl = fieldData['course-image']?.url || '';
+  // Add cdn.webflow.com to relative URLs
+  const processedImageUrl = imageUrl.startsWith('/')
+    ? `https://cdn.webflow.com${imageUrl}`
+    : imageUrl;
+
   return {
     _id: id,
     name: fieldData.name,
     slug: fieldData.slug,
-    imageUrl: fieldData['course-image']?.url || '',
+    imageUrl: processedImageUrl,
     location: fieldData.location || 'Location coming soon',
     price: fieldData.price || '$$$',
     holes: fieldData['number-of-holes'] || 18,
