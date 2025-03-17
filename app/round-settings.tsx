@@ -9,6 +9,20 @@ import { TeeSelectionModal } from './tee-selection-modal';
 import { VisibilitySelectionModal } from './visibility-selection-modal';
 import { GameTypeSelectionModal } from './game-type-selection-modal';
 
+interface RoundSettings {
+  courseId: string;
+  courseName: string;
+  courseSlug: string;
+  startingHole: number;
+  selectedTee: {
+    color: string;
+    gender: 'male' | 'female';
+  } | null;
+  visibility: Array<'everyone' | 'friends' | 'private' | 'group'>;
+  selectedGroupIds: string[];
+  gameType: string;
+}
+
 interface UserGroup {
   id: string;
   name: string;
@@ -27,10 +41,14 @@ export default function RoundSettingsScreen() {
   const [showVisibilitySelection, setShowVisibilitySelection] = useState(false);
   const [showGameTypeSelection, setShowGameTypeSelection] = useState(false);
   const [selectedGender, setSelectedGender] = useState<'men' | 'women'>('men');
-  const [selectedTee, setSelectedTee] = useState<'black' | 'middle' | 'forward'>('middle');
+  const [selectedTee, setSelectedTee] = useState<{
+    color: string;
+    gender: 'male' | 'female';
+  } | null>(null);
   const [selectedVisibility, setSelectedVisibility] = useState<('everyone' | 'friends' | 'private' | 'group')[]>(['everyone']);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [selectedGameType, setSelectedGameType] = useState('stroke');
+  const [selectedCourse, setSelectedCourse] = useState(courses?.find(c => c._id === params.courseId));
 
   // Mock data for user groups - replace with actual data from your backend
   const userGroups: UserGroup[] = [
@@ -58,24 +76,31 @@ export default function RoundSettingsScreen() {
   };
 
   const handleStartRound = () => {
+    if (!selectedCourse) return;
+
+    const settings: RoundSettings = {
+      courseId: selectedCourse._id,
+      courseName: selectedCourse.name,
+      courseSlug: selectedCourse.slug,
+      startingHole,
+      selectedTee,
+      visibility: selectedVisibility,
+      selectedGroupIds,
+      gameType: selectedGameType,
+    };
+
     router.push({
-      pathname: '/active-round',
-      params: {
-        courseId: params.courseId,
-        courseName: params.courseName,
-        settings: JSON.stringify({
-          numberOfPlayers,
-          roundType,
-          startingHole,
-          gameType: selectedGameType,
-        })
-      }
-    } as any);
+      pathname: '/add-players' as any,
+      params: { settings: JSON.stringify(settings) },
+    });
   };
 
-  const handleTeeSelect = (gender: 'men' | 'women', tee: 'black' | 'middle' | 'forward') => {
+  const handleTeeSelect = (gender: 'men' | 'women', color: string) => {
     setSelectedGender(gender);
-    setSelectedTee(tee);
+    setSelectedTee({
+      color,
+      gender: gender === 'men' ? 'male' : 'female',
+    });
     setShowTeeSelection(false);
   };
 
@@ -113,9 +138,8 @@ export default function RoundSettingsScreen() {
   };
 
   const getTeeDisplay = () => {
-    const gender = selectedGender.charAt(0).toUpperCase() + selectedGender.slice(1);
-    const tee = selectedTee.charAt(0).toUpperCase() + selectedTee.slice(1);
-    return `${gender} - ${tee} Tee`;
+    if (!selectedTee) return 'Select Tee';
+    return `${selectedTee.color} Tees (${selectedTee.gender === 'male' ? 'Men' : 'Women'})`;
   };
 
   const getVisibilityDisplay = () => {

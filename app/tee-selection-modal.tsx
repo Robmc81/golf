@@ -6,9 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 interface TeeSelectionModalProps {
   visible: boolean;
   onClose: () => void;
-  onSelect: (gender: 'men' | 'women', tee: 'black' | 'middle' | 'forward') => void;
-  selectedGender?: 'men' | 'women';
-  selectedTee?: 'black' | 'middle' | 'forward';
+  onSelect: (gender: 'men' | 'women', color: string) => void;
+  selectedGender: 'men' | 'women';
+  selectedTee: {
+    color: string;
+    gender: 'male' | 'female';
+  } | null;
 }
 
 export const TeeSelectionModal: React.FC<TeeSelectionModalProps> = ({
@@ -42,59 +45,69 @@ export const TeeSelectionModal: React.FC<TeeSelectionModalProps> = ({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Select Tee</Text>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Tee</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={colors.text} />
+              <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.genderSelector}>
+          <View style={styles.genderContainer}>
             <TouchableOpacity
               style={[
                 styles.genderButton,
-                activeGender === 'men' && styles.activeGenderButton,
+                selectedGender === 'men' && styles.genderButtonSelected,
               ]}
               onPress={() => setActiveGender('men')}
             >
-              <Text style={[
-                styles.genderButtonText,
-                activeGender === 'men' && styles.activeGenderButtonText,
-              ]}>Men</Text>
+              <Text
+                style={[
+                  styles.genderButtonText,
+                  selectedGender === 'men' && styles.genderButtonTextSelected,
+                ]}
+              >
+                Men
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.genderButton,
-                activeGender === 'women' && styles.activeGenderButton,
+                selectedGender === 'women' && styles.genderButtonSelected,
               ]}
               onPress={() => setActiveGender('women')}
             >
-              <Text style={[
-                styles.genderButtonText,
-                activeGender === 'women' && styles.activeGenderButtonText,
-              ]}>Women</Text>
+              <Text
+                style={[
+                  styles.genderButtonText,
+                  selectedGender === 'women' && styles.genderButtonTextSelected,
+                ]}
+              >
+                Women
+              </Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.teeList}>
+          <View style={styles.teeContainer}>
             {tees[activeGender].map((tee) => (
               <TouchableOpacity
                 key={tee.color}
                 style={[
                   styles.teeButton,
-                  selectedTee === tee.color && styles.selectedTeeButton,
+                  selectedTee?.color === tee.color && styles.teeButtonSelected,
                 ]}
-                onPress={() => onSelect(activeGender, tee.color as 'black' | 'middle' | 'forward')}
+                onPress={() => onSelect(activeGender, tee.color as string)}
               >
-                <Text style={[
-                  styles.teeButtonText,
-                  selectedTee === tee.color && styles.selectedTeeButtonText,
-                ]}>
+                <Text
+                  style={[
+                    styles.teeButtonText,
+                    selectedTee?.color === tee.color && styles.teeButtonTextSelected,
+                  ]}
+                >
                   {tee.color.charAt(0).toUpperCase() + tee.color.slice(1)} Tee
                 </Text>
                 <Text style={[
                   styles.teeYardsText,
-                  selectedTee === tee.color && styles.selectedTeeButtonText,
+                  selectedTee?.color === tee.color && styles.selectedTeeButtonText,
                 ]}>
                   {tee.yards} yds
                 </Text>
@@ -120,13 +133,13 @@ const styles = StyleSheet.create({
     padding: 20,
     maxHeight: '80%',
   },
-  header: {
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
   },
-  title: {
+  modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
@@ -134,7 +147,7 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 5,
   },
-  genderSelector: {
+  genderContainer: {
     flexDirection: 'row',
     marginBottom: 20,
     backgroundColor: colors.card,
@@ -147,7 +160,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
   },
-  activeGenderButton: {
+  genderButtonSelected: {
     backgroundColor: colors.primary,
   },
   genderButtonText: {
@@ -155,10 +168,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  activeGenderButtonText: {
+  genderButtonTextSelected: {
     color: colors.background,
   },
-  teeList: {
+  teeContainer: {
     gap: 10,
   },
   teeButton: {
@@ -169,13 +182,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: 10,
   },
-  selectedTeeButton: {
+  teeButtonSelected: {
     backgroundColor: colors.primary,
   },
   teeButtonText: {
     color: colors.text,
     fontSize: 16,
     fontWeight: '500',
+  },
+  teeButtonTextSelected: {
+    color: colors.background,
+    opacity: 1,
   },
   teeYardsText: {
     color: colors.text,
