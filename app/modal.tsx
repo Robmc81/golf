@@ -105,8 +105,8 @@ export default function ModalScreen() {
         <TouchableOpacity 
           style={styles.playButton}
           onPress={() => {
-            // Navigate to golf courses list
-            router.push('/golf-courses' as any);
+            // Navigate to courses tab
+            router.push('/(tabs)');
           }}
         >
           <FontAwesome name="play-circle" size={24} color={colors.white} style={styles.playIcon} />

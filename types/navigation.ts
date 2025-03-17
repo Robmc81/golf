@@ -1,6 +1,5 @@
 export type RootStackParamList = {
   '/(tabs)': undefined;
-  '/(tabs)/golf-courses': undefined;
   '/(tabs)/profile': undefined;
   '/(tabs)/create': undefined;
   '/course-details': {
