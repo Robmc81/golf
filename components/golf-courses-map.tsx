@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View, TouchableOpacity, Text } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { FontAwesome } from '@expo/vector-icons';
-import { colors } from '@/constants/colors';
+import { colors } from '../app/constants/colors';
 
 interface GolfCourse {
   id: string;

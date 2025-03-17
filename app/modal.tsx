@@ -2,7 +2,7 @@ import { StatusBar } from "expo-status-bar";
 import { Platform, StyleSheet, Text, View, TouchableOpacity, FlatList, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { FontAwesome } from '@expo/vector-icons';
-import { colors } from '@/constants/colors';
+import { colors } from './constants/colors';
 
 interface GolfCourse {
   id: string;

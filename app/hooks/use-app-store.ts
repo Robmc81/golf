@@ -48,21 +48,32 @@ export type CourseStats = {
 export type AppState = {
   favoriteCourses: string[];
   rounds: Round[];
+  isLoggedIn: boolean;
+  currentUser: { email: string } | null;
+
+  // Course actions
   addFavoriteCourse: (courseId: string) => void;
   removeFavoriteCourse: (courseId: string) => void;
   isFavoriteCourse: (courseId: string) => boolean;
   loadFavoriteCourses: () => Promise<void>;
-  // Round management
-  addRound: (round: Omit<Round, 'id'>) => void;
+
+  // Round actions
   getRoundsForCourse: (courseId: string) => Round[];
   getLastRound: (courseId: string) => Round | null;
   getCourseStats: (courseId: string) => CourseStats;
   loadRounds: () => Promise<void>;
+  addRound: (round: Round) => void;
+
+  // Auth actions
+  login: (email: string) => { email: string } | null;
+  logout: () => void;
 };
 
 const createStore = (set: any, get: any): AppState => ({
   favoriteCourses: [],
-  rounds: [],
+  rounds: MOCK_ROUNDS,
+  isLoggedIn: false,
+  currentUser: null,
   
   addFavoriteCourse: (courseId: string) => {
     console.log('Adding favorite course:', courseId);
@@ -174,7 +185,7 @@ const createStore = (set: any, get: any): AppState => ({
     }
   },
 
-  addRound: (round: Omit<Round, 'id'>) => {
+  addRound: (round: Round) => {
     console.log('Adding new round:', round);
     set((state: AppState) => {
       const newRound = {
@@ -185,6 +196,16 @@ const createStore = (set: any, get: any): AppState => ({
       AsyncStorage.setItem('rounds', JSON.stringify(newRounds));
       return { rounds: newRounds };
     });
+  },
+
+  // Auth actions
+  login: (email) => {
+    const user = { email };
+    set({ currentUser: user, isLoggedIn: true });
+    return user;
+  },
+  logout: () => {
+    set({ currentUser: null, isLoggedIn: false });
   },
 });
 

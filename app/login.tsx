@@ -11,8 +11,8 @@ import {
   Alert
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAppStore } from '@/hooks/use-app-store';
-import { colors } from '@/constants/colors';
+import { useAppStore } from './hooks/use-app-store';
+import { colors } from './constants/colors';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');

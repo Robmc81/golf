@@ -11,8 +11,8 @@ import {
   Alert
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAppStore } from '@/hooks/use-app-store';
-import { colors } from '@/constants/colors';
+import { useAppStore } from '../hooks/use-app-store';
+import { colors } from '../constants/colors';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -40,7 +40,7 @@ export default function LoginScreen() {
     >
       <View style={styles.content}>
         <Image
-          source={require('@/assets/images/logo.png')}
+          source={require('../../assets/images/logo.png')}
           style={styles.logo}
           resizeMode="contain"
         />

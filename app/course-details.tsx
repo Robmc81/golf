@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Platform, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../constants/colors';
+import { colors } from './constants/colors';
 import { useCourseDetails, type Course } from './hooks/use-course-details';
 import { useAppStore } from './hooks/use-app-store';
 import { format } from 'date-fns';
