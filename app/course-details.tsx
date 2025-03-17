@@ -78,12 +78,6 @@ export default function CourseDetailsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Course Stats</Text>
           <Text style={styles.noStatsText}>You haven't played any rounds at this course yet.</Text>
-          <TouchableOpacity 
-            style={styles.startRoundButton}
-            onPress={() => router.push(`/round-settings?courseId=${course._id}&courseName=${course.name}`)}
-          >
-            <Text style={styles.startRoundButtonText}>Start Your First Round</Text>
-          </TouchableOpacity>
         </View>
       );
     }
@@ -476,17 +470,5 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 16,
-  },
-  startRoundButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  startRoundButtonText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  }
 }); 
