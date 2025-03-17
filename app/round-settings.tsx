@@ -6,6 +6,13 @@ import HoleSelectionModal from './hole-selection-modal';
 import { useCourses } from './hooks/use-courses';
 import { colors } from './constants/colors';
 import { TeeSelectionModal } from './tee-selection-modal';
+import { VisibilitySelectionModal } from './visibility-selection-modal';
+
+interface UserGroup {
+  id: string;
+  name: string;
+  memberCount: number;
+}
 
 export default function RoundSettingsScreen() {
   const router = useRouter();
@@ -13,15 +20,25 @@ export default function RoundSettingsScreen() {
   const { data: courses, isLoading } = useCourses();
   const [isCompetitive, setIsCompetitive] = useState(false);
   const [trackPutts, setTrackPutts] = useState(true);
-  const [trackGIR, setTrackGIR] = useState(true);
+  const [trackGir, setTrackGir] = useState(true);
   const [trackFairways, setTrackFairways] = useState(true);
   const [numberOfPlayers, setNumberOfPlayers] = useState(1);
   const [roundType, setRoundType] = useState('18');
   const [startingHole, setStartingHole] = useState(1);
   const [showHoleSelection, setShowHoleSelection] = useState(false);
   const [showTeeSelection, setShowTeeSelection] = useState(false);
+  const [showVisibilitySelection, setShowVisibilitySelection] = useState(false);
   const [selectedGender, setSelectedGender] = useState<'men' | 'women'>('men');
   const [selectedTee, setSelectedTee] = useState<'black' | 'middle' | 'forward'>('middle');
+  const [selectedVisibility, setSelectedVisibility] = useState<('everyone' | 'friends' | 'private' | 'group')[]>(['everyone']);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+
+  // Mock data for user groups - replace with actual data from your backend
+  const userGroups: UserGroup[] = [
+    { id: '1', name: 'Georgia Hackers', memberCount: 150 },
+    { id: '2', name: 'Atlanta Golf Club', memberCount: 75 },
+    { id: '3', name: 'Peachtree Golfers', memberCount: 200 },
+  ];
 
   const handleStartRound = () => {
     router.push({
@@ -32,7 +49,7 @@ export default function RoundSettingsScreen() {
         settings: JSON.stringify({
           isCompetitive,
           trackPutts,
-          trackGIR,
+          trackGir,
           trackFairways,
           numberOfPlayers,
           roundType,
@@ -48,10 +65,66 @@ export default function RoundSettingsScreen() {
     setShowTeeSelection(false);
   };
 
+  const handleVisibilitySelect = (visibility: 'everyone' | 'friends' | 'private' | 'group', groupId?: string) => {
+    if (visibility === 'private') {
+      // If selecting private, clear all other selections
+      setSelectedVisibility(['private']);
+      setSelectedGroupIds([]);
+      return;
+    }
+
+    if (visibility === 'group' && groupId) {
+      // Toggle group selection
+      setSelectedGroupIds(prev => {
+        if (prev.includes(groupId)) {
+          return prev.filter(id => id !== groupId);
+        }
+        return [...prev, groupId];
+      });
+      return;
+    }
+
+    // Toggle visibility selection
+    setSelectedVisibility(prev => {
+      // If trying to deselect the last option, keep at least one option selected
+      if (prev.length === 1 && prev.includes(visibility)) {
+        return ['everyone']; // Default to 'everyone' if trying to deselect the last option
+      }
+      
+      if (prev.includes(visibility)) {
+        return prev.filter(v => v !== visibility);
+      }
+      return [...prev, visibility];
+    });
+  };
+
   const getTeeDisplay = () => {
     const gender = selectedGender.charAt(0).toUpperCase() + selectedGender.slice(1);
     const tee = selectedTee.charAt(0).toUpperCase() + selectedTee.slice(1);
     return `${gender} - ${tee} Tee`;
+  };
+
+  const getVisibilityDisplay = () => {
+    if (selectedVisibility.includes('private')) {
+      return 'Only Me';
+    }
+
+    const displayParts: string[] = [];
+    
+    if (selectedVisibility.includes('everyone')) {
+      displayParts.push('Everyone');
+    }
+    if (selectedVisibility.includes('friends')) {
+      displayParts.push('Friends');
+    }
+    if (selectedGroupIds.length > 0) {
+      const groupNames = selectedGroupIds
+        .map(id => userGroups.find(g => g.id === id)?.name)
+        .filter((name): name is string => name !== undefined);
+      displayParts.push(...groupNames);
+    }
+
+    return displayParts.length > 0 ? displayParts.join(', ') : 'Select Visibility';
   };
 
   return (
@@ -117,6 +190,17 @@ export default function RoundSettingsScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Round Visibility</Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => setShowVisibilitySelection(true)}
+          >
+            <Text style={styles.buttonText}>{getVisibilityDisplay()}</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Game Type</Text>
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Competitive Round</Text>
@@ -143,10 +227,10 @@ export default function RoundSettingsScreen() {
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Greens in Regulation (GIR)</Text>
             <Switch
-              value={trackGIR}
-              onValueChange={setTrackGIR}
+              value={trackGir}
+              onValueChange={setTrackGir}
               trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={trackGIR ? '#4CAF50' : '#f4f3f4'}
+              thumbColor={trackGir ? '#4CAF50' : '#f4f3f4'}
             />
           </View>
           <View style={styles.settingRow}>
@@ -200,6 +284,14 @@ export default function RoundSettingsScreen() {
         onSelect={handleTeeSelect}
         selectedGender={selectedGender}
         selectedTee={selectedTee}
+      />
+
+      <VisibilitySelectionModal
+        visible={showVisibilitySelection}
+        onClose={() => setShowVisibilitySelection(false)}
+        onSelect={handleVisibilitySelect}
+        selectedVisibility={selectedVisibility}
+        selectedGroupIds={selectedGroupIds}
       />
     </SafeAreaView>
   );
