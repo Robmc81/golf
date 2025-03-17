@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import HoleSelectionModal from './hole-selection-modal';
 
 export default function RoundSettingsScreen() {
   const router = useRouter();
@@ -11,6 +12,9 @@ export default function RoundSettingsScreen() {
   const [trackGIR, setTrackGIR] = useState(true);
   const [trackFairways, setTrackFairways] = useState(true);
   const [numberOfPlayers, setNumberOfPlayers] = useState(1);
+  const [roundType, setRoundType] = useState('18');
+  const [startingHole, setStartingHole] = useState(1);
+  const [showHoleSelection, setShowHoleSelection] = useState(false);
 
   const handleStartRound = () => {
     router.push({
@@ -23,7 +27,9 @@ export default function RoundSettingsScreen() {
           trackPutts,
           trackGIR,
           trackFairways,
-          numberOfPlayers
+          numberOfPlayers,
+          roundType,
+          startingHole
         })
       }
     } as any);
@@ -45,6 +51,41 @@ export default function RoundSettingsScreen() {
       </View>
 
       <ScrollView style={styles.content}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Round Type</Text>
+          <View style={styles.roundTypeContainer}>
+            <TouchableOpacity 
+              style={[styles.roundTypeButton, roundType === '18' && styles.roundTypeButtonActive]}
+              onPress={() => setRoundType('18')}
+            >
+              <Text style={[styles.roundTypeText, roundType === '18' && styles.roundTypeTextActive]}>18 Holes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.roundTypeButton, roundType === 'front9' && styles.roundTypeButtonActive]}
+              onPress={() => setRoundType('front9')}
+            >
+              <Text style={[styles.roundTypeText, roundType === 'front9' && styles.roundTypeTextActive]}>Front 9</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.roundTypeButton, roundType === 'back9' && styles.roundTypeButtonActive]}
+              onPress={() => setRoundType('back9')}
+            >
+              <Text style={[styles.roundTypeText, roundType === 'back9' && styles.roundTypeTextActive]}>Back 9</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Starting From</Text>
+          <TouchableOpacity 
+            style={styles.startingHoleButton}
+            onPress={() => setShowHoleSelection(true)}
+          >
+            <Text style={styles.startingHoleText}>Hole {startingHole}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Game Type</Text>
           <View style={styles.settingRow}>
@@ -115,6 +156,13 @@ export default function RoundSettingsScreen() {
           <Text style={styles.startButtonText}>Start Round</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <HoleSelectionModal
+        visible={showHoleSelection}
+        onClose={() => setShowHoleSelection(false)}
+        onSelect={setStartingHole}
+        currentHole={startingHole}
+      />
     </SafeAreaView>
   );
 }
@@ -167,6 +215,42 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   settingLabel: {
+    fontSize: 16,
+    color: '#333',
+  },
+  roundTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  roundTypeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+  },
+  roundTypeButtonActive: {
+    backgroundColor: '#4CAF50',
+  },
+  roundTypeText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  roundTypeTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  startingHoleButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+  },
+  startingHoleText: {
     fontSize: 16,
     color: '#333',
   },
