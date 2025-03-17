@@ -3,10 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, SafeAreaV
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import HoleSelectionModal from './hole-selection-modal';
+import { useCourses } from './hooks/use-courses';
+import { colors } from './constants/colors';
+import { TeeSelectionModal } from './tee-selection-modal';
 
 export default function RoundSettingsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { data: courses, isLoading } = useCourses();
   const [isCompetitive, setIsCompetitive] = useState(false);
   const [trackPutts, setTrackPutts] = useState(true);
   const [trackGIR, setTrackGIR] = useState(true);
@@ -15,6 +19,9 @@ export default function RoundSettingsScreen() {
   const [roundType, setRoundType] = useState('18');
   const [startingHole, setStartingHole] = useState(1);
   const [showHoleSelection, setShowHoleSelection] = useState(false);
+  const [showTeeSelection, setShowTeeSelection] = useState(false);
+  const [selectedGender, setSelectedGender] = useState<'men' | 'women'>('men');
+  const [selectedTee, setSelectedTee] = useState<'black' | 'middle' | 'forward'>('middle');
 
   const handleStartRound = () => {
     router.push({
@@ -33,6 +40,18 @@ export default function RoundSettingsScreen() {
         })
       }
     } as any);
+  };
+
+  const handleTeeSelect = (gender: 'men' | 'women', tee: 'black' | 'middle' | 'forward') => {
+    setSelectedGender(gender);
+    setSelectedTee(tee);
+    setShowTeeSelection(false);
+  };
+
+  const getTeeDisplay = () => {
+    const gender = selectedGender.charAt(0).toUpperCase() + selectedGender.slice(1);
+    const tee = selectedTee.charAt(0).toUpperCase() + selectedTee.slice(1);
+    return `${gender} - ${tee} Tee`;
   };
 
   return (
@@ -83,6 +102,17 @@ export default function RoundSettingsScreen() {
           >
             <Text style={styles.startingHoleText}>Hole {startingHole}</Text>
             <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Select a Tee</Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => setShowTeeSelection(true)}
+          >
+            <Text style={styles.buttonText}>{getTeeDisplay()}</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -162,6 +192,14 @@ export default function RoundSettingsScreen() {
         onClose={() => setShowHoleSelection(false)}
         onSelect={setStartingHole}
         currentHole={startingHole}
+      />
+
+      <TeeSelectionModal
+        visible={showTeeSelection}
+        onClose={() => setShowTeeSelection(false)}
+        onSelect={handleTeeSelect}
+        selectedGender={selectedGender}
+        selectedTee={selectedTee}
       />
     </SafeAreaView>
   );
@@ -285,5 +323,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  button: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+  },
+  buttonText: {
+    fontSize: 16,
+    color: '#333',
   },
 }); 
