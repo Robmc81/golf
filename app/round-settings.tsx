@@ -7,6 +7,7 @@ import { useCourses } from './hooks/use-courses';
 import { colors } from './constants/colors';
 import { TeeSelectionModal } from './tee-selection-modal';
 import { VisibilitySelectionModal } from './visibility-selection-modal';
+import { GameTypeSelectionModal } from './game-type-selection-modal';
 
 interface UserGroup {
   id: string;
@@ -18,20 +19,18 @@ export default function RoundSettingsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { data: courses, isLoading } = useCourses();
-  const [isCompetitive, setIsCompetitive] = useState(false);
-  const [trackPutts, setTrackPutts] = useState(true);
-  const [trackGir, setTrackGir] = useState(true);
-  const [trackFairways, setTrackFairways] = useState(true);
   const [numberOfPlayers, setNumberOfPlayers] = useState(1);
   const [roundType, setRoundType] = useState('18');
   const [startingHole, setStartingHole] = useState(1);
   const [showHoleSelection, setShowHoleSelection] = useState(false);
   const [showTeeSelection, setShowTeeSelection] = useState(false);
   const [showVisibilitySelection, setShowVisibilitySelection] = useState(false);
+  const [showGameTypeSelection, setShowGameTypeSelection] = useState(false);
   const [selectedGender, setSelectedGender] = useState<'men' | 'women'>('men');
   const [selectedTee, setSelectedTee] = useState<'black' | 'middle' | 'forward'>('middle');
   const [selectedVisibility, setSelectedVisibility] = useState<('everyone' | 'friends' | 'private' | 'group')[]>(['everyone']);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [selectedGameType, setSelectedGameType] = useState('stroke');
 
   // Mock data for user groups - replace with actual data from your backend
   const userGroups: UserGroup[] = [
@@ -40,6 +39,24 @@ export default function RoundSettingsScreen() {
     { id: '3', name: 'Peachtree Golfers', memberCount: 200 },
   ];
 
+  const handleGameTypeSelect = (gameType: string) => {
+    setSelectedGameType(gameType);
+    setShowGameTypeSelection(false);
+  };
+
+  const getGameTypeDisplay = () => {
+    const gameTypes: { [key: string]: string } = {
+      stroke: 'Stroke Play',
+      tournament: 'Tournament',
+      skins: 'Skins',
+      match: 'Match Play',
+      practice: 'Practice Round',
+      scramble: 'Scramble',
+      'me-vs-me': 'Me vs Me',
+    };
+    return gameTypes[selectedGameType] || 'Select Game Type';
+  };
+
   const handleStartRound = () => {
     router.push({
       pathname: '/active-round',
@@ -47,13 +64,10 @@ export default function RoundSettingsScreen() {
         courseId: params.courseId,
         courseName: params.courseName,
         settings: JSON.stringify({
-          isCompetitive,
-          trackPutts,
-          trackGir,
-          trackFairways,
           numberOfPlayers,
           roundType,
-          startingHole
+          startingHole,
+          gameType: selectedGameType,
         })
       }
     } as any);
@@ -202,46 +216,13 @@ export default function RoundSettingsScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Game Type</Text>
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Competitive Round</Text>
-            <Switch
-              value={isCompetitive}
-              onValueChange={setIsCompetitive}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={isCompetitive ? '#4CAF50' : '#f4f3f4'}
-            />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Statistics to Track</Text>
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Putts</Text>
-            <Switch
-              value={trackPutts}
-              onValueChange={setTrackPutts}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={trackPutts ? '#4CAF50' : '#f4f3f4'}
-            />
-          </View>
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Greens in Regulation (GIR)</Text>
-            <Switch
-              value={trackGir}
-              onValueChange={setTrackGir}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={trackGir ? '#4CAF50' : '#f4f3f4'}
-            />
-          </View>
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Fairways Hit</Text>
-            <Switch
-              value={trackFairways}
-              onValueChange={setTrackFairways}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={trackFairways ? '#4CAF50' : '#f4f3f4'}
-            />
-          </View>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => setShowGameTypeSelection(true)}
+          >
+            <Text style={styles.buttonText}>{getGameTypeDisplay()}</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.text} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -292,6 +273,13 @@ export default function RoundSettingsScreen() {
         onSelect={handleVisibilitySelect}
         selectedVisibility={selectedVisibility}
         selectedGroupIds={selectedGroupIds}
+      />
+
+      <GameTypeSelectionModal
+        visible={showGameTypeSelection}
+        onClose={() => setShowGameTypeSelection(false)}
+        onSelect={handleGameTypeSelect}
+        selectedGameType={selectedGameType}
       />
     </SafeAreaView>
   );
