@@ -8,16 +8,23 @@ import {
   TextInput,
   SafeAreaView,
   Image,
+  ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { CompetitiveOptionsModal } from './competitive-options-modal';
+import { GuestPlayerModal } from './guest-player-modal';
 
 interface Player {
   id: string;
   name: string;
   avatar?: string;
   lastPlayed?: string;
+  gender?: 'male' | 'female';
+  handicap?: number;
+  phone?: string;
+  email?: string;
+  isGuest?: boolean;
 }
 
 // Mock data - replace with actual data from your backend
@@ -44,6 +51,8 @@ export default function AddPlayersScreen() {
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
   const [showCompetitiveOptions, setShowCompetitiveOptions] = useState(false);
   const [selectedCompetitiveOption, setSelectedCompetitiveOption] = useState<string>();
+  const [showGuestPlayerModal, setShowGuestPlayerModal] = useState(false);
+  const [guestPlayers, setGuestPlayers] = useState<Player[]>([]);
 
   const handlePlayerSelect = (playerId: string) => {
     setSelectedPlayers(prev => {
@@ -72,13 +81,42 @@ export default function AddPlayersScreen() {
     setShowCompetitiveOptions(false);
   };
 
+  const handleAddGuestPlayer = (player: {
+    name: string;
+    gender: 'male' | 'female';
+    handicap?: number;
+    phone?: string;
+    email?: string;
+  }) => {
+    const newGuestPlayer: Player = {
+      id: `guest-${Date.now()}`,
+      name: player.name,
+      gender: player.gender,
+      handicap: player.handicap,
+      phone: player.phone,
+      email: player.email,
+      isGuest: true,
+    };
+    setGuestPlayers(prev => [...prev, newGuestPlayer]);
+    // Automatically select the new guest player
+    setSelectedPlayers(prev => new Set([...prev, newGuestPlayer.id]));
+  };
+
   const handleStartRound = () => {
     if (selectedPlayers.size === 0) return;
 
     const settings = JSON.parse(params.settings as string);
     const selectedPlayersList = [...selectedPlayers].map(id => {
-      const player = [...recentPlayers, ...allFriends].find(p => p.id === id);
-      return { id, name: player?.name };
+      const player = [...recentPlayers, ...allFriends, ...guestPlayers].find(p => p.id === id);
+      return { 
+        id, 
+        name: player?.name,
+        gender: player?.gender,
+        handicap: player?.handicap,
+        phone: player?.phone,
+        email: player?.email,
+        isGuest: player?.isGuest,
+      };
     });
 
     router.push({
@@ -98,6 +136,7 @@ export default function AddPlayersScreen() {
       style={[
         styles.playerItem,
         selectedPlayers.has(item.id) && styles.playerItemSelected,
+        item.isGuest && styles.guestPlayerItem,
       ]}
       onPress={() => handlePlayerSelect(item.id)}
     >
@@ -106,7 +145,7 @@ export default function AddPlayersScreen() {
           {item.avatar ? (
             <Image source={{ uri: item.avatar }} style={styles.avatar} />
           ) : (
-            <View style={styles.avatarPlaceholder}>
+            <View style={[styles.avatarPlaceholder, item.isGuest && styles.guestAvatarPlaceholder]}>
               <Text style={styles.avatarText}>
                 {item.name.split(' ').map(n => n[0]).join('')}
               </Text>
@@ -114,9 +153,15 @@ export default function AddPlayersScreen() {
           )}
         </View>
         <View style={styles.playerDetails}>
-          <Text style={styles.playerName}>{item.name}</Text>
+          <Text style={styles.playerName}>
+            {item.name}
+            {item.isGuest && <Text style={styles.guestBadge}> (Guest)</Text>}
+          </Text>
           {item.lastPlayed && (
             <Text style={styles.lastPlayed}>Last played: {item.lastPlayed}</Text>
+          )}
+          {item.handicap !== undefined && (
+            <Text style={styles.playerDetails}>Handicap: {item.handicap}</Text>
           )}
         </View>
       </View>
@@ -126,9 +171,35 @@ export default function AddPlayersScreen() {
     </TouchableOpacity>
   );
 
-  const filteredFriends = allFriends.filter(friend =>
-    friend.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const allPlayers = [...recentPlayers, ...allFriends, ...guestPlayers];
+  const filteredPlayers = allPlayers.filter(player =>
+    player.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const renderSelectedPlayerAvatar = (playerId: string) => {
+    const player = [...recentPlayers, ...allFriends, ...guestPlayers].find(p => p.id === playerId);
+    if (!player) return null;
+
+    return (
+      <View key={playerId} style={styles.selectedPlayerAvatar}>
+        {player.avatar ? (
+          <Image source={{ uri: player.avatar }} style={styles.selectedAvatarImage} />
+        ) : (
+          <View style={[
+            styles.selectedAvatarPlaceholder,
+            player.isGuest && styles.selectedGuestAvatarPlaceholder
+          ]}>
+            <Text style={styles.selectedAvatarText}>
+              {player.name.split(' ').map(n => n[0]).join('')}
+            </Text>
+          </View>
+        )}
+        <Text style={styles.selectedPlayerName} numberOfLines={1}>
+          {player.name}
+        </Text>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -168,14 +239,31 @@ export default function AddPlayersScreen() {
         <Ionicons name="chevron-forward" size={24} color="#666" />
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.addGuestButton}
+        onPress={() => setShowGuestPlayerModal(true)}
+      >
+        <View style={styles.addGuestButtonContent}>
+          <Ionicons name="person-add-outline" size={24} color="#4CAF50" />
+          <Text style={styles.addGuestButtonText}>Write-In Guest Player</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={24} color="#666" />
+      </TouchableOpacity>
+
       <FlatList
-        data={filteredFriends}
+        data={filteredPlayers}
         renderItem={renderPlayerItem}
         keyExtractor={item => item.id}
         ListHeaderComponent={
           <>
             <Text style={styles.sectionTitle}>Recently Played With</Text>
             {recentPlayers.map(player => renderPlayerItem({ item: player }))}
+            {guestPlayers.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>Guest Players</Text>
+                {guestPlayers.map(player => renderPlayerItem({ item: player }))}
+              </>
+            )}
             <Text style={styles.sectionTitle}>All Friends</Text>
           </>
         }
@@ -188,10 +276,23 @@ export default function AddPlayersScreen() {
         selectedOption={selectedCompetitiveOption}
       />
 
+      <GuestPlayerModal
+        visible={showGuestPlayerModal}
+        onClose={() => setShowGuestPlayerModal(false)}
+        onAdd={handleAddGuestPlayer}
+      />
+
       <View style={styles.footer}>
         <Text style={styles.selectedCount}>
           {selectedPlayers.size} player{selectedPlayers.size !== 1 ? 's' : ''} selected
         </Text>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.selectedPlayersContainer}
+        >
+          {[...selectedPlayers].map(renderSelectedPlayerAvatar)}
+        </ScrollView>
         <TouchableOpacity
           style={[
             styles.startButton,
@@ -312,6 +413,43 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 12,
   },
+  selectedPlayersContainer: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  selectedPlayerAvatar: {
+    alignItems: 'center',
+    marginRight: 12,
+    width: 60,
+  },
+  selectedAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginBottom: 4,
+  },
+  selectedAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  selectedGuestAvatarPlaceholder: {
+    backgroundColor: '#FFA726',
+  },
+  selectedAvatarText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  selectedPlayerName: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
   startButton: {
     backgroundColor: '#4CAF50',
     padding: 16,
@@ -352,5 +490,37 @@ const styles = StyleSheet.create({
   competitiveButtonSubtitle: {
     fontSize: 14,
     color: '#666',
+  },
+  addGuestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    marginTop: 8,
+  },
+  addGuestButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  addGuestButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginLeft: 12,
+  },
+  guestPlayerItem: {
+    backgroundColor: '#f8f9fa',
+  },
+  guestAvatarPlaceholder: {
+    backgroundColor: '#FFA726',
+  },
+  guestBadge: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 4,
   },
 }); 
