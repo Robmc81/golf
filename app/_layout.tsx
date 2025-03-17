@@ -5,7 +5,6 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
-import { AuthGuard } from '@/components/auth-guard';
 import { colors } from '@/constants/colors';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -56,7 +55,6 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AuthGuard />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
