@@ -12,8 +12,18 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import AddPlayerModal from './add-player-modal';
+
+const mockPlayers = [
+  {
+    id: '1',
+    name: 'R. McFadden',
+    handicap: 20,
+    scores: Array(18).fill(null),
+    netScores: Array(18).fill(null),
+  },
+];
 
 interface Player {
   id: string;
@@ -38,6 +48,10 @@ interface Props {
   players: Player[];
   orientation?: 'vertical' | 'horizontal';
   currentHole?: number;
+  competitiveOptions?: {
+    type: string;
+    target: string;
+  };
 }
 
 interface ScoreEditModalProps {
@@ -279,9 +293,24 @@ export default function Scorecard({
   players: initialPlayers,
   orientation = 'vertical',
   currentHole: initialHole = 1,
+  competitiveOptions,
 }: Props) {
   const router = useRouter();
-  const [players, setPlayers] = useState(initialPlayers);
+  const params = useLocalSearchParams();
+  const settings = params.settings ? JSON.parse(params.settings as string) : null;
+  
+  // Initialize players with mock player first, then add players from settings
+  const [players, setPlayers] = useState(() => {
+    // Get other players from settings
+    const otherPlayers = (settings?.players || initialPlayers || []).map((player: Player) => ({
+      ...player,
+      scores: Array(holes.length).fill(null),
+      netScores: Array(holes.length).fill(null),
+    }));
+
+    // Return array with mock player first, followed by other players
+    return [...mockPlayers, ...otherPlayers];
+  });
   const [activeTab, setActiveTab] = useState<'scores' | 'stats'>('scores');
   const [currentHole, setCurrentHole] = useState(initialHole);
   const [showScoreEditModal, setShowScoreEditModal] = useState(false);
@@ -302,8 +331,8 @@ export default function Scorecard({
 
   // Calculate gross and net scores for the selected player
   const selectedPlayer = players[selectedPlayerIndex];
-  const grossScore = selectedPlayer?.scores.reduce((sum: number, score) => sum + (score || 0), 0) || 0;
-  const netScore = selectedPlayer?.netScores.reduce((sum: number, score) => sum + (score || 0), 0) || 0;
+  const grossScore = selectedPlayer?.scores.reduce((sum: number, score: number | null) => sum + (score || 0), 0) || 0;
+  const netScore = selectedPlayer?.netScores.reduce((sum: number, score: number | null) => sum + (score || 0), 0) || 0;
 
   const handleAddPlayers = (newPlayers: Player[]) => {
     // Initialize scores arrays for new players
@@ -318,19 +347,19 @@ export default function Scorecard({
   const handleHolePress = (holeNumber: number) => {
     setCurrentHole(holeNumber);
     // Get current scores for the hole
-    const currentScores = players.reduce((acc, player) => {
+    const currentScores = players.reduce((acc: { [key: string]: number }, player: Player) => {
       const score = player.scores[holeNumber - 1];
       if (score !== null) {
         acc[player.id] = score;
       }
       return acc;
-    }, {} as { [key: string]: number });
+    }, {});
     setEditingScores(currentScores);
     setShowScoreEditModal(true);
   };
 
   const handleSaveScores = (scores: { [key: string]: number }) => {
-    setPlayers(prev => prev.map(player => {
+    setPlayers((prev: Player[]) => prev.map((player: Player) => {
       if (scores[player.id] !== undefined) {
         const newScores = [...player.scores];
         const newNetScores = [...player.netScores];
@@ -365,8 +394,8 @@ export default function Scorecard({
 
   // Add new function to check for missing scores
   const hasMissingScores = () => {
-    return players.some(player => 
-      player.scores.some(score => score === null)
+    return players.some((player: Player) => 
+      player.scores.some((score: number | null) => score === null)
     );
   };
 
@@ -412,26 +441,39 @@ export default function Scorecard({
   const renderHeader = () => (
     <View style={styles.header}>
       <View style={styles.headerTop}>
-        <Text style={styles.courseName}>{courseName}</Text>
-        <TouchableOpacity style={styles.closeButton}>
-          <Ionicons name="close" size={24} color="#000" />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.courseInfo}>
-        <Text style={styles.teeInfo}>
-          {teeName} • {rating}/{slope}
-        </Text>
-        <View style={styles.scoreDisplay}>
-          <Text style={styles.scoreLabel}>Gross/Net</Text>
-          <Text style={styles.scoreValue}>{grossScore}/{netScore}</Text>
+        <View style={styles.courseDetails}>
+          <Text style={styles.courseName}>{courseName}</Text>
+          <Text style={styles.teeInfo}>{teeColor} Tees - {teeName}</Text>
+          <Text style={styles.ratingInfo}>Rating: {rating} | Slope: {slope}</Text>
+          {competitiveOptions && (
+            <View style={styles.competitiveOptionsContainer}>
+              <Text style={styles.competitiveOptionsText}>
+                {competitiveOptions.type === 'last-round' ? 'Competing against last round' :
+                 competitiveOptions.type === 'course-average' ? 'Competing against course average' :
+                 competitiveOptions.type === 'best-round' ? 'Competing against best round' :
+                 competitiveOptions.type === 'best-by-hole' ? 'Competing against best by hole' :
+                 competitiveOptions.type === 'course-record' ? 'Competing against course record' : ''}
+              </Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.headerRight}>
+          <View style={styles.scoreDisplay}>
+            <Text style={styles.scoreLabel}>Gross/Net</Text>
+            <Text style={styles.scoreValue}>{grossScore}/{netScore}</Text>
+          </View>
+          <TouchableOpacity style={styles.closeButton}>
+            <Ionicons name="close" size={24} color="#000" />
+          </TouchableOpacity>
         </View>
       </View>
+
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
         style={styles.playerSelector}
       >
-        {players.map((player, index) => (
+        {players.map((player: Player, index: number) => (
           <TouchableOpacity
             key={player.id}
             style={[
@@ -445,7 +487,7 @@ export default function Scorecard({
             ) : (
               <View style={styles.playerSelectorAvatarPlaceholder}>
                 <Text style={styles.playerSelectorAvatarText}>
-                  {player.name.split(' ').map((n) => n[0]).join('')}
+                  {player.name.split(' ').map((n: string) => n[0]).join('')}
                 </Text>
               </View>
             )}
@@ -483,7 +525,7 @@ export default function Scorecard({
   );
 
   const renderScorecard = () => (
-    <ScrollView horizontal={false} style={styles.scorecard}>
+    <ScrollView style={styles.scorecard}>
       <View style={styles.scorecardContainer}>
         {/* Fixed left column for labels */}
         <View style={styles.leftColumn}>
@@ -496,7 +538,7 @@ export default function Scorecard({
           <View style={styles.headerCell}>
             <Text style={styles.rowHeader}>Handicap</Text>
           </View>
-          {players.map((player) => (
+          {players.map((player: Player, index: number) => (
             <View key={player.id} style={styles.playerNameCell}>
               <View style={styles.playerInfo}>
                 {player.avatar ? (
@@ -504,19 +546,27 @@ export default function Scorecard({
                 ) : (
                   <View style={styles.avatarPlaceholder}>
                     <Text style={styles.avatarText}>
-                      {player.name.split(' ').map((n) => n[0]).join('')}
+                      {player.name.split(' ').map((n: string) => n[0]).join('')}
                     </Text>
                   </View>
                 )}
-                <View style={styles.playerNameContainer}>
-                  <Text style={styles.playerName} numberOfLines={1}>
-                    {player.name}
-                  </Text>
-                  <Text style={styles.playerHandicap}>CH {player.handicap || 0}</Text>
-                </View>
+                <Text style={styles.playerName} numberOfLines={1}>
+                  {player.name}
+                </Text>
               </View>
             </View>
           ))}
+          <TouchableOpacity 
+            style={styles.scorecardAddPlayerButton}
+            onPress={() => setShowAddPlayerModal(true)}
+          >
+            <View style={styles.playerInfo}>
+              <View style={[styles.avatarPlaceholder, { backgroundColor: '#007AFF' }]}>
+                <Ionicons name="add" size={16} color="#fff" />
+              </View>
+              <Text style={[styles.playerName, { color: '#007AFF' }]}>Add Player</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Scrollable right section for holes and scores */}
@@ -545,37 +595,35 @@ export default function Scorecard({
             {/* Par Row */}
             <View style={styles.gridRow}>
               {holes.map((hole) => (
-                <TouchableOpacity
+                <View
                   key={hole.number}
                   style={[
                     styles.gridCell,
                     styles.dataCell,
                     hole.number === currentHole && styles.currentHoleCell
                   ]}
-                  onPress={() => handleHolePress(hole.number)}
                 >
                   <Text style={styles.rowData}>{hole.par}</Text>
-                </TouchableOpacity>
+                </View>
               ))}
               <View style={[styles.gridCell, styles.dataCell, styles.totalCell]}>
-                <Text style={styles.rowData}>{holes.reduce((sum: number, hole) => sum + hole.par, 0)}</Text>
+                <Text style={styles.rowData}>{holes.reduce((sum, hole) => sum + hole.par, 0)}</Text>
               </View>
             </View>
 
             {/* Handicap Row */}
             <View style={styles.gridRow}>
               {holes.map((hole) => (
-                <TouchableOpacity
+                <View
                   key={hole.number}
                   style={[
                     styles.gridCell,
                     styles.dataCell,
                     hole.number === currentHole && styles.currentHoleCell
                   ]}
-                  onPress={() => handleHolePress(hole.number)}
                 >
                   <Text style={styles.rowData}>{hole.handicap}</Text>
-                </TouchableOpacity>
+                </View>
               ))}
               <View style={[styles.gridCell, styles.dataCell, styles.totalCell]}>
                 <Text style={styles.rowData}>-</Text>
@@ -583,7 +631,7 @@ export default function Scorecard({
             </View>
 
             {/* Player Score Rows */}
-            {players.map((player) => (
+            {players.map((player: Player) => (
               <View key={player.id} style={styles.gridRow}>
                 {holes.map((hole, index) => (
                   <TouchableOpacity
@@ -591,47 +639,49 @@ export default function Scorecard({
                     style={[
                       styles.gridCell,
                       styles.dataCell,
-                      hole.number === currentHole && styles.currentHoleCell
+                      hole.number === currentHole && styles.currentHoleCell,
+                      player.scores[index] !== null && styles.filledScoreCell
                     ]}
                     onPress={() => handleHolePress(hole.number)}
                   >
-                    <Text style={styles.scoreCellText}>
+                    <Text style={[
+                      styles.scoreCellText,
+                      player.scores[index] !== null && (
+                        player.scores[index]! > holes[index].par ? styles.overParScore :
+                        player.scores[index]! < holes[index].par ? styles.underParScore :
+                        styles.parScore
+                      )
+                    ]}>
                       {player.scores[index] !== null ? player.scores[index] : '-'}
                     </Text>
                   </TouchableOpacity>
                 ))}
                 <View style={[styles.gridCell, styles.dataCell, styles.totalCell]}>
                   <Text style={styles.totalScoreCellText}>
-                    {player.scores.reduce((sum: number, score) => sum + (score || 0), 0)}
+                    {player.scores.reduce((sum: number, score: number | null) => sum + (score || 0), 0)}
                   </Text>
                 </View>
               </View>
             ))}
+
+            {/* Empty row for Add Player button alignment */}
+            <View style={styles.gridRow}>
+              {holes.map((hole, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.gridCell,
+                    styles.dataCell,
+                    hole.number === currentHole && styles.currentHoleCell,
+                    styles.emptyScoreCell
+                  ]}
+                />
+              ))}
+              <View style={[styles.gridCell, styles.dataCell, styles.totalCell]} />
+            </View>
           </View>
         </ScrollView>
       </View>
-
-      <TouchableOpacity 
-        style={styles.addPlayerButton}
-        onPress={() => setShowAddPlayerModal(true)}
-      >
-        <Ionicons name="add-circle" size={32} color="#007AFF" />
-        <Text style={styles.addPlayerText}>Add Player</Text>
-      </TouchableOpacity>
-
-      <AddPlayerModal
-        visible={showAddPlayerModal}
-        onClose={() => setShowAddPlayerModal(false)}
-        onAddPlayers={handleAddPlayers}
-        currentSettings={JSON.stringify({
-          courseName,
-          teeName,
-          teeColor,
-          rating,
-          slope,
-          holes,
-        })}
-      />
 
       <ScoreEditModal
         visible={showScoreEditModal}
@@ -697,6 +747,20 @@ export default function Scorecard({
       {renderTabs()}
       {activeTab === 'scores' ? renderScorecard() : null}
       {renderFooter()}
+
+      <AddPlayerModal
+        visible={showAddPlayerModal}
+        onClose={() => setShowAddPlayerModal(false)}
+        onAddPlayers={handleAddPlayers}
+        currentSettings={JSON.stringify({
+          courseName,
+          teeName,
+          teeColor,
+          rating,
+          slope,
+          holes,
+        })}
+      />
     </SafeAreaView>
   );
 }
@@ -714,29 +778,40 @@ const styles = StyleSheet.create({
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+  },
+  courseDetails: {
+    flex: 1,
+    marginRight: 16,
+  },
+  headerRight: {
+    alignItems: 'flex-end',
   },
   courseName: {
     fontSize: 20,
     fontWeight: '600',
+    marginBottom: 4,
   },
   closeButton: {
     padding: 4,
   },
-  courseInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-  },
   teeInfo: {
     fontSize: 16,
     color: '#667',
+    marginBottom: 2,
+  },
+  ratingInfo: {
+    fontSize: 16,
+    color: '#667',
+    marginBottom: 4,
   },
   scoreDisplay: {
     backgroundColor: '#F5F5F5',
     padding: 8,
     borderRadius: 8,
+    marginBottom: 8,
+    minWidth: 100,
+    alignItems: 'center',
   },
   scoreLabel: {
     fontSize: 14,
@@ -776,20 +851,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   leftColumn: {
-    width: 120,
+    width: 150,
     backgroundColor: '#fff',
+    borderRightWidth: 1,
+    borderRightColor: '#E5E5E5',
   },
   gridContainer: {
     backgroundColor: '#fff',
   },
   gridRow: {
     flexDirection: 'row',
-    height: 30,
-    backgroundColor: '#fff',
+    height: 40,
   },
   gridCell: {
-    width: 40,
-    height: 30,
+    width: 50,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
     borderRightWidth: 1,
@@ -797,76 +873,104 @@ const styles = StyleSheet.create({
     borderColor: '#E5E5E5',
   },
   headerCell: {
-    height: 30,
     backgroundColor: '#F5F5F5',
+    height: 40,
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
   },
   dataCell: {
     backgroundColor: '#fff',
   },
   totalCell: {
-    width: 60,
+    width: 70,
     backgroundColor: '#F5F5F5',
   },
   playerNameCell: {
-    height: 30,
+    height: 40,
     justifyContent: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
-    paddingLeft: 8,
+    paddingHorizontal: 8,
   },
   playerInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  playerNameContainer: {
-    flex: 1,
-    marginLeft: 8,
-  },
   playerAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: 8,
   },
   avatarPlaceholder: {
-    width: 22,
-    height: 22,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 8,
   },
   avatarText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   playerName: {
-    fontSize: 12,
+    fontSize: 14,
     flex: 1,
-    marginRight: 8,
   },
-  playerHandicap: {
-    fontSize: 8,
-    color: '#667',
+  columnHeader: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  rowHeader: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    paddingLeft: 8,
+  },
+  rowData: {
+    fontSize: 14,
+    color: '#333',
   },
   scoreCellText: {
     fontSize: 16,
+    fontWeight: '500',
   },
   totalScoreCellText: {
     fontSize: 16,
     fontWeight: '600',
   },
+  currentHoleCell: {
+    backgroundColor: '#E3F2FD',
+  },
+  filledScoreCell: {
+    backgroundColor: '#FAFAFA',
+  },
+  overParScore: {
+    color: '#FF3B30',
+  },
+  underParScore: {
+    color: '#34C759',
+  },
+  parScore: {
+    color: '#333',
+  },
   addPlayerButton: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
+    justifyContent: 'center',
+    padding: 8,
+    marginRight: 16,
+    height: '100%',
   },
   addPlayerText: {
-    fontSize: 16,
+    fontSize: 12,
     color: '#007AFF',
-    marginLeft: 8,
+    marginTop: 4,
   },
   footer: {
     flexDirection: 'row',
@@ -897,104 +1001,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
     borderRadius: 8,
-  },
-  columnHeader: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#333',
-    textAlign: 'center',
-    width: '100%',
-    paddingRight: 8,
-  },
-  rowHeader: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#666',
-    textAlign: 'right',
-    width: '100%',
-    paddingRight: 8,
-  },
-  rowData: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#333',
-  },
-  currentHoleCell: {
-    backgroundColor: '#E3F2FD',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  scoreInputRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-  },
-  modalAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  modalAvatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalAvatarText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalPlayerName: {
-    fontSize: 16,
-    marginLeft: 12,
-  },
-  scoreInput: {
-    width: 60,
-    height: 40,
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-    borderRadius: 8,
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  saveButton: {
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   tabInstructions: {
     position: 'absolute',
@@ -1203,5 +1209,100 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 4,
+  },
+  competitiveOptionsContainer: {
+    backgroundColor: '#f0f0f0',
+    padding: 8,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  competitiveOptionsText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  scoreInputRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+  },
+  modalAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  modalAvatarPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalAvatarText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalPlayerName: {
+    fontSize: 16,
+    marginLeft: 12,
+  },
+  scoreInput: {
+    width: 60,
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: 8,
+    textAlign: 'center',
+    fontSize: 16,
+  },
+  saveButton: {
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  scorecardAddPlayerButton: {
+    height: 40,
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+    paddingHorizontal: 8,
+    backgroundColor: '#F5F5F5',
+  },
+  emptyScoreCell: {
+    backgroundColor: '#F5F5F5',
   },
 }); 

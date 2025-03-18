@@ -142,6 +142,16 @@ export default function AddPlayersScreen({
       return newPlayer;
     }).filter((player): player is Player => player !== null);
 
+    // Handle competitive options
+    const competitiveOptions = selectedCompetitiveOption ? {
+      type: selectedCompetitiveOption,
+      target: selectedCompetitiveOption === 'last-round' ? 'last' :
+              selectedCompetitiveOption === 'course-average' ? 'average' :
+              selectedCompetitiveOption === 'best-round' ? 'best' :
+              selectedCompetitiveOption === 'best-by-hole' ? 'best-hole' :
+              selectedCompetitiveOption === 'course-record' ? 'record' : 'none'
+    } : undefined;
+
     if (isModal && onAddPlayers) {
       onAddPlayers(selectedPlayersList);
       onClose?.();
@@ -153,6 +163,7 @@ export default function AddPlayersScreen({
           settings: JSON.stringify({
             ...settings,
             players: selectedPlayersList,
+            competitiveOptions,
           }),
         },
       });

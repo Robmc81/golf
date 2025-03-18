@@ -9,6 +9,25 @@ import { TeeSelectionModal } from './tee-selection-modal';
 import { VisibilitySelectionModal } from './visibility-selection-modal';
 import { GameTypeSelectionModal } from './game-type-selection-modal';
 
+interface Player {
+  id: string;
+  name: string;
+  avatar?: string;
+  handicap?: number;
+  scores: (number | null)[];
+  netScores: (number | null)[];
+  gender?: 'male' | 'female';
+  phone?: string;
+  email?: string;
+  isGuest?: boolean;
+}
+
+interface UserGroup {
+  id: string;
+  name: string;
+  memberCount: number;
+}
+
 interface RoundSettings {
   courseId: string;
   courseName: string;
@@ -21,19 +40,18 @@ interface RoundSettings {
   visibility: Array<'everyone' | 'friends' | 'private' | 'group'>;
   selectedGroupIds: string[];
   gameType: string;
-}
-
-interface UserGroup {
-  id: string;
-  name: string;
-  memberCount: number;
+  roundType: string;
+  players?: Player[];
+  competitiveOptions?: {
+    type: string;
+    target: string;
+  };
 }
 
 export default function RoundSettingsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { data: courses, isLoading } = useCourses();
-  const [numberOfPlayers, setNumberOfPlayers] = useState(1);
   const [roundType, setRoundType] = useState('18');
   const [startingHole, setStartingHole] = useState(1);
   const [showHoleSelection, setShowHoleSelection] = useState(false);
@@ -87,6 +105,7 @@ export default function RoundSettingsScreen() {
       visibility: selectedVisibility,
       selectedGroupIds,
       gameType: selectedGameType,
+      roundType,
     };
 
     router.push({
@@ -249,25 +268,6 @@ export default function RoundSettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Number of Players</Text>
-          <View style={styles.playerCountContainer}>
-            <TouchableOpacity 
-              style={styles.playerCountButton}
-              onPress={() => setNumberOfPlayers(Math.max(1, numberOfPlayers - 1))}
-            >
-              <Ionicons name="remove" size={24} color="#4CAF50" />
-            </TouchableOpacity>
-            <Text style={styles.playerCount}>{numberOfPlayers}</Text>
-            <TouchableOpacity 
-              style={styles.playerCountButton}
-              onPress={() => setNumberOfPlayers(Math.min(4, numberOfPlayers + 1))}
-            >
-              <Ionicons name="add" size={24} color="#4CAF50" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
         <TouchableOpacity 
           style={styles.startButton}
           onPress={handleStartRound}
@@ -395,26 +395,6 @@ const styles = StyleSheet.create({
   startingHoleText: {
     fontSize: 16,
     color: '#333',
-  },
-  playerCountContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  playerCountButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  playerCount: {
-    fontSize: 24,
-    fontWeight: '600',
-    minWidth: 40,
-    textAlign: 'center',
   },
   startButton: {
     margin: 16,
