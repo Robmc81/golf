@@ -308,8 +308,15 @@ export default function Scorecard({
       netScores: Array(holes.length).fill(null),
     }));
 
+    // Create a new array for mock player scores
+    const mockPlayerWithScores = mockPlayers.map(player => ({
+      ...player,
+      scores: Array(holes.length).fill(null),
+      netScores: Array(holes.length).fill(null),
+    }));
+
     // Return array with mock player first, followed by other players
-    return [...mockPlayers, ...otherPlayers];
+    return [...mockPlayerWithScores, ...otherPlayers];
   });
   const [activeTab, setActiveTab] = useState<'scores' | 'stats'>('scores');
   const [currentHole, setCurrentHole] = useState(initialHole);
@@ -335,7 +342,7 @@ export default function Scorecard({
   const netScore = selectedPlayer?.netScores.reduce((sum: number, score: number | null) => sum + (score || 0), 0) || 0;
 
   const handleAddPlayers = (newPlayers: Player[]) => {
-    // Initialize scores arrays for new players
+    // Initialize scores arrays for new players with new arrays for each player
     const playersWithScores = newPlayers.map(player => ({
       ...player,
       scores: Array(holes.length).fill(null),
@@ -366,6 +373,7 @@ export default function Scorecard({
         const score = scores[player.id];
         const oldScore = player.scores[currentHole - 1];
         
+        // Update only the current hole's score
         newScores[currentHole - 1] = score;
         const netScore = score - (player.handicap || 0);
         newNetScores[currentHole - 1] = netScore;
