@@ -442,6 +442,16 @@ export default function Scorecard({
     router.push('/');
   };
 
+  const handleGPSPress = () => {
+    router.push({
+      pathname: 'hole-view' as const,
+      params: {
+        holeNumber: currentHole.toString(),
+        courseId: params.courseId
+      }
+    });
+  };
+
   // If showing summary, render the RoundSummary component
   if (showSummary) {
     return (
@@ -742,7 +752,10 @@ export default function Scorecard({
 
   const renderFooter = () => (
     <View style={styles.footer}>
-      <TouchableOpacity style={styles.footerButton}>
+      <TouchableOpacity 
+        style={styles.footerButton}
+        onPress={handleGPSPress}
+      >
         <Text style={styles.footerButtonText}>Back to GPS</Text>
       </TouchableOpacity>
       <TouchableOpacity 
@@ -789,6 +802,12 @@ export default function Scorecard({
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="black" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Scorecard</Text>
+      </View>
       {renderHeader()}
       {renderTabs()}
       {activeTab === 'scores' ? renderScorecard() : null}
@@ -1375,5 +1394,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#2E7D32',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginLeft: 16,
   },
 }); 

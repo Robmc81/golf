@@ -77,6 +77,16 @@ function RootLayoutNav(): JSX.Element {
             headerTintColor: colors.text,
           }}
         />
+        <Stack.Screen
+          name="hole-view"
+          options={{
+            title: 'Hole View',
+            headerStyle: {
+              backgroundColor: colors.background,
+            },
+            headerTintColor: colors.text,
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );

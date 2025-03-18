@@ -2,6 +2,10 @@ export type RootStackParamList = {
   '/(tabs)': undefined;
   '/(tabs)/profile': undefined;
   '/(tabs)/create': undefined;
+  'hole-view': {
+    holeNumber: string;
+    courseId: string;
+  };
   '/course-details': {
     id: string;
     name: string;
