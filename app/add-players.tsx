@@ -247,16 +247,33 @@ export default function AddPlayersScreen({
           style={styles.backButton}
           onPress={isModal ? onClose : () => router.back()}
         >
-          <Ionicons 
-            name={isModal ? "close" : "chevron-back"} 
-            size={24} 
-            color="#333" 
-          />
+          <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.title}>
-          {isModal ? "Add Players to Round" : "Add Players"}
-        </Text>
+        <Text style={styles.headerTitle}>Add Players</Text>
       </View>
+
+      <TouchableOpacity
+        style={styles.skipButton}
+        onPress={() => {
+          if (isModal && onClose) {
+            onClose();
+          } else {
+            router.push({
+              pathname: '/active-round' as any,
+              params: {
+                ...params,
+                settings: JSON.stringify({
+                  ...settings,
+                  players: [],
+                  competitiveOptions: undefined,
+                }),
+              },
+            });
+          }
+        }}
+      >
+        <Text style={styles.skipButtonText}>Skip Adding Players</Text>
+      </TouchableOpacity>
 
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
@@ -370,7 +387,7 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
-  title: {
+  headerTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#333',
@@ -569,5 +586,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginLeft: 4,
+  },
+  skipButton: {
+    padding: 12,
+    backgroundColor: '#F5F5F5',
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  skipButtonText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
   },
 }); 

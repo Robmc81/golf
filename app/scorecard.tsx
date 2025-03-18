@@ -17,11 +17,11 @@ import AddPlayerModal from './add-player-modal';
 
 const mockPlayers = [
   {
-    id: '1',
+    id: 'mock-player-1',
     name: 'R. McFadden',
     handicap: 20,
-    scores: Array(18).fill(null),
-    netScores: Array(18).fill(null),
+    scores: [4, 5, 3, 4, 5, 4, 3, 4, 5, 4, 5, 3, 4, 5, 4, 3, 4, 5],
+    netScores: [-16, -15, -17, -16, -15, -16, -17, -16, -15, -16, -15, -17, -16, -15, -16, -17, -16, -15],
   },
 ];
 
@@ -88,16 +88,28 @@ function ScoreEditModal({ visible, onClose, onSave, players, currentHole, curren
 
   // Update scores when modal becomes visible or currentScores changes
   React.useEffect(() => {
-    setScores(currentScores);
+    // Reset scores when modal becomes visible
+    if (visible) {
+      setScores(currentScores);
+    }
   }, [visible, currentScores]);
 
   const handleScoreChange = (playerId: string, text: string) => {
     const score = parseInt(text) || 0;
+    // Only update the score for the specific player
     setScores(prev => ({ ...prev, [playerId]: score }));
   };
 
   const handleSave = () => {
-    onSave(scores);
+    // Only save scores that have been entered and are valid
+    const scoresToSave = Object.entries(scores).reduce((acc, [playerId, score]) => {
+      if (score > 0) {
+        acc[playerId] = score;
+      }
+      return acc;
+    }, {} as { [key: string]: number });
+    
+    onSave(scoresToSave);
     onClose();
   };
 
@@ -311,8 +323,8 @@ export default function Scorecard({
     // Create a new array for mock player scores
     const mockPlayerWithScores = mockPlayers.map(player => ({
       ...player,
-      scores: Array(holes.length).fill(null),
-      netScores: Array(holes.length).fill(null),
+      scores: Array(holes.length).fill(null), // Always initialize with null scores
+      netScores: Array(holes.length).fill(null), // Always initialize with null scores
     }));
 
     // Return array with mock player first, followed by other players
@@ -339,7 +351,7 @@ export default function Scorecard({
   // Calculate gross and net scores for the selected player
   const selectedPlayer = players[selectedPlayerIndex];
   const grossScore = selectedPlayer?.scores.reduce((sum: number, score: number | null) => sum + (score || 0), 0) || 0;
-  const netScore = selectedPlayer?.netScores.reduce((sum: number, score: number | null) => sum + (score || 0), 0) || 0;
+  const netScore = grossScore - (selectedPlayer?.handicap || 0);
 
   const handleAddPlayers = (newPlayers: Player[]) => {
     // Initialize scores arrays for new players with new arrays for each player
@@ -367,16 +379,14 @@ export default function Scorecard({
 
   const handleSaveScores = (scores: { [key: string]: number }) => {
     setPlayers((prev: Player[]) => prev.map((player: Player) => {
+      // Only update the score if this player's ID matches a score in the scores object
       if (scores[player.id] !== undefined) {
         const newScores = [...player.scores];
-        const newNetScores = [...player.netScores];
         const score = scores[player.id];
         const oldScore = player.scores[currentHole - 1];
         
-        // Update only the current hole's score
+        // Update only the current hole's score for this specific player
         newScores[currentHole - 1] = score;
-        const netScore = score - (player.handicap || 0);
-        newNetScores[currentHole - 1] = netScore;
 
         // Track modifications if round has ended
         if (roundEndTime) {
@@ -393,9 +403,9 @@ export default function Scorecard({
         return {
           ...player,
           scores: newScores,
-          netScores: newNetScores,
         };
       }
+      // Return player unchanged if no score update
       return player;
     }));
   };
@@ -466,13 +476,13 @@ export default function Scorecard({
           )}
         </View>
         <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.closeButton}>
+            <Ionicons name="close" size={24} color="#000" />
+          </TouchableOpacity>
           <View style={styles.scoreDisplay}>
             <Text style={styles.scoreLabel}>Gross/Net</Text>
             <Text style={styles.scoreValue}>{grossScore}/{netScore}</Text>
           </View>
-          <TouchableOpacity style={styles.closeButton}>
-            <Ionicons name="close" size={24} color="#000" />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -672,6 +682,34 @@ export default function Scorecard({
               </View>
             ))}
 
+            {/* Comp Scores Row */}
+            {competitiveOptions && (
+              <View style={styles.gridRow}>
+                <View style={[styles.gridCell, styles.dataCell, styles.compScoreCell]}>
+                  <Text style={styles.compScoreLabel}>Comp Scores</Text>
+                </View>
+                {holes.map((hole, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.gridCell,
+                      styles.dataCell,
+                      styles.compScoreCell
+                    ]}
+                  >
+                    <Text style={styles.compScoreText}>
+                      {mockPlayers[0].scores[index]}
+                    </Text>
+                  </View>
+                ))}
+                <View style={[styles.gridCell, styles.dataCell, styles.totalCell, styles.compScoreCell]}>
+                  <Text style={styles.compScoreText}>
+                    {mockPlayers[0].scores.reduce((sum, score) => sum + score, 0)}
+                  </Text>
+                </View>
+              </View>
+            )}
+
             {/* Empty row for Add Player button alignment */}
             <View style={styles.gridRow}>
               {holes.map((hole, index) => (
@@ -740,7 +778,7 @@ export default function Scorecard({
                 style={[styles.alertButton, styles.alertButtonConfirm]}
                 onPress={() => handleMissingScoresAlert(true)}
               >
-                <Text style={styles.alertButtonText}>End Round</Text>
+                <Text style={styles.alertButtonConfirmText}>End Round</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -802,6 +840,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     padding: 4,
+    marginBottom: 8,
   },
   teeInfo: {
     fontSize: 16,
@@ -817,7 +856,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     padding: 8,
     borderRadius: 8,
-    marginBottom: 8,
     minWidth: 100,
     alignItems: 'center',
   },
@@ -1096,6 +1134,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#007AFF',
   },
+  alertButtonConfirmText: {
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
   summaryContainer: {
     flex: 1,
     backgroundColor: '#fff',
@@ -1312,5 +1356,24 @@ const styles = StyleSheet.create({
   },
   emptyScoreCell: {
     backgroundColor: '#F5F5F5',
+  },
+  compScoreCell: {
+    backgroundColor: '#E8F5E9',
+    borderTopWidth: 2,
+    borderTopColor: '#4CAF50',
+    borderBottomWidth: 2,
+    borderBottomColor: '#4CAF50',
+  },
+  compScoreLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2E7D32',
+    textAlign: 'left',
+    paddingLeft: 8,
+  },
+  compScoreText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2E7D32',
   },
 }); 

@@ -218,22 +218,6 @@ export default function CourseDetailsScreen() {
 
       <View style={styles.actionContainer}>
         <TouchableOpacity 
-          style={[styles.actionButton, styles.myCourseButton]}
-          onPress={toggleFavorite}
-        >
-          <Ionicons 
-            name={isFavoriteCourse(course._id) ? "heart" : "heart-outline"} 
-            size={24} 
-            color={isFavoriteCourse(course._id) ? colors.white : colors.primary} 
-          />
-          <Text style={[
-            styles.myCourseButtonText,
-            isFavoriteCourse(course._id) && styles.myCourseButtonTextActive
-          ]}>
-            {isFavoriteCourse(course._id) ? 'My Course' : 'Add to My Courses'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
           style={[styles.actionButton, styles.primaryButton]}
           onPress={() => router.push(`/round-settings?courseId=${course._id}&courseName=${course.name}`)}
         >
@@ -384,32 +368,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    justifyContent: 'center',
   },
   actionButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
+    paddingHorizontal: 32,
     borderRadius: 8,
-  },
-  myCourseButton: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    marginRight: 8,
+    width: '100%',
   },
   primaryButton: {
     backgroundColor: colors.primary,
-    marginLeft: 8,
-  },
-  myCourseButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: colors.primary,
-  },
-  myCourseButtonTextActive: {
-    color: colors.white,
   },
   primaryButtonText: {
     marginLeft: 8,
