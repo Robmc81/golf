@@ -25,28 +25,43 @@ interface Player {
   phone?: string;
   email?: string;
   isGuest?: boolean;
+  scores: (number | null)[];
+  netScores: (number | null)[];
 }
 
 // Mock data - replace with actual data from your backend
 const recentPlayers: Player[] = [
-  { id: '1', name: 'John Smith', lastPlayed: '2 days ago' },
-  { id: '2', name: 'Mike Johnson', lastPlayed: '1 week ago' },
-  { id: '3', name: 'Sarah Williams', lastPlayed: '2 weeks ago' },
-  { id: '4', name: 'David Brown', lastPlayed: '3 weeks ago' },
-  { id: '5', name: 'Emma Davis', lastPlayed: '1 month ago' },
+  { id: '1', name: 'John Smith', lastPlayed: '2 days ago', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
+  { id: '2', name: 'Mike Johnson', lastPlayed: '1 week ago', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
+  { id: '3', name: 'Sarah Williams', lastPlayed: '2 weeks ago', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
+  { id: '4', name: 'David Brown', lastPlayed: '3 weeks ago', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
+  { id: '5', name: 'Emma Davis', lastPlayed: '1 month ago', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
 ];
 
 const allFriends: Player[] = [
-  { id: '6', name: 'Alex Wilson' },
-  { id: '7', name: 'Lisa Anderson' },
-  { id: '8', name: 'Tom Martinez' },
-  { id: '9', name: 'Rachel Lee' },
-  { id: '10', name: 'Chris Taylor' },
+  { id: '6', name: 'Alex Wilson', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
+  { id: '7', name: 'Lisa Anderson', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
+  { id: '8', name: 'Tom Martinez', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
+  { id: '9', name: 'Rachel Lee', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
+  { id: '10', name: 'Chris Taylor', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
 ];
 
-export default function AddPlayersScreen() {
+interface Props {
+  isModal?: boolean;
+  onClose?: () => void;
+  onAddPlayers?: (players: Player[]) => void;
+  settings?: string;
+}
+
+export default function AddPlayersScreen({ 
+  isModal, 
+  onClose, 
+  onAddPlayers,
+  settings: initialSettings 
+}: Props = {}) {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const settings = initialSettings ? JSON.parse(initialSettings) : JSON.parse(params.settings as string);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
   const [showCompetitiveOptions, setShowCompetitiveOptions] = useState(false);
@@ -96,6 +111,8 @@ export default function AddPlayersScreen() {
       phone: player.phone,
       email: player.email,
       isGuest: true,
+      scores: Array(18).fill(null),
+      netScores: Array(18).fill(null),
     };
     setGuestPlayers(prev => [...prev, newGuestPlayer]);
     // Automatically select the new guest player
@@ -105,30 +122,41 @@ export default function AddPlayersScreen() {
   const handleStartRound = () => {
     if (selectedPlayers.size === 0) return;
 
-    const settings = JSON.parse(params.settings as string);
     const selectedPlayersList = [...selectedPlayers].map(id => {
       const player = [...recentPlayers, ...allFriends, ...guestPlayers].find(p => p.id === id);
-      return { 
-        id, 
-        name: player?.name,
-        gender: player?.gender,
-        handicap: player?.handicap,
-        phone: player?.phone,
-        email: player?.email,
-        isGuest: player?.isGuest,
+      if (!player) return null;
+      
+      const newPlayer: Player = {
+        id,
+        name: player.name,
+        scores: player.scores,
+        netScores: player.netScores,
+        avatar: player.avatar,
+        gender: player.gender,
+        handicap: player.handicap,
+        phone: player.phone,
+        email: player.email,
+        isGuest: player.isGuest,
       };
-    });
+      
+      return newPlayer;
+    }).filter((player): player is Player => player !== null);
 
-    router.push({
-      pathname: '/active-round' as any,
-      params: {
-        ...params,
-        settings: JSON.stringify({
-          ...settings,
-          players: selectedPlayersList,
-        }),
-      },
-    });
+    if (isModal && onAddPlayers) {
+      onAddPlayers(selectedPlayersList);
+      onClose?.();
+    } else {
+      router.push({
+        pathname: '/active-round' as any,
+        params: {
+          ...params,
+          settings: JSON.stringify({
+            ...settings,
+            players: selectedPlayersList,
+          }),
+        },
+      });
+    }
   };
 
   const renderPlayerItem = ({ item }: { item: Player }) => (
@@ -206,11 +234,17 @@ export default function AddPlayersScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={isModal ? onClose : () => router.back()}
         >
-          <Ionicons name="chevron-back" size={24} color="#333" />
+          <Ionicons 
+            name={isModal ? "close" : "chevron-back"} 
+            size={24} 
+            color="#333" 
+          />
         </TouchableOpacity>
-        <Text style={styles.title}>Add Players</Text>
+        <Text style={styles.title}>
+          {isModal ? "Add Players to Round" : "Add Players"}
+        </Text>
       </View>
 
       <View style={styles.searchContainer}>
@@ -301,7 +335,9 @@ export default function AddPlayersScreen() {
           onPress={handleStartRound}
           disabled={selectedPlayers.size === 0}
         >
-          <Text style={styles.startButtonText}>Start Round</Text>
+          <Text style={styles.startButtonText}>
+            {isModal ? "Add to Round" : "Start Round"}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
