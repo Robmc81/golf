@@ -120,44 +120,62 @@ export default function AddPlayersScreen({
   };
 
   const handleStartRound = () => {
-    if (selectedPlayers.size === 0) return;
-
-    const selectedPlayersList = [...selectedPlayers].map(id => {
-      const player = [...recentPlayers, ...allFriends, ...guestPlayers].find(p => p.id === id);
-      if (!player) return null;
-      
-      const newPlayer: Player = {
-        id,
-        name: player.name,
-        scores: player.scores,
-        netScores: player.netScores,
-        avatar: player.avatar,
-        gender: player.gender,
-        handicap: player.handicap,
-        phone: player.phone,
-        email: player.email,
-        isGuest: player.isGuest,
-      };
-      
-      return newPlayer;
-    }).filter((player): player is Player => player !== null);
-
-    // Handle competitive options
-    const competitiveOptions = selectedCompetitiveOption ? {
-      type: selectedCompetitiveOption,
-      target: selectedCompetitiveOption === 'last-round' ? 'last' :
-              selectedCompetitiveOption === 'course-average' ? 'average' :
-              selectedCompetitiveOption === 'best-round' ? 'best' :
-              selectedCompetitiveOption === 'best-by-hole' ? 'best-hole' :
-              selectedCompetitiveOption === 'course-record' ? 'record' : 'none'
-    } : undefined;
-
     if (isModal && onAddPlayers) {
+      const selectedPlayersList = [...selectedPlayers].map(id => {
+        const player = [...recentPlayers, ...allFriends, ...guestPlayers].find(p => p.id === id);
+        if (!player) return null;
+        
+        const newPlayer: Player = {
+          id,
+          name: player.name,
+          scores: player.scores,
+          netScores: player.netScores,
+          avatar: player.avatar,
+          gender: player.gender,
+          handicap: player.handicap,
+          phone: player.phone,
+          email: player.email,
+          isGuest: player.isGuest,
+        };
+        
+        return newPlayer;
+      }).filter((player): player is Player => player !== null);
+
       onAddPlayers(selectedPlayersList);
       onClose?.();
     } else {
+      const selectedPlayersList = [...selectedPlayers].map(id => {
+        const player = [...recentPlayers, ...allFriends, ...guestPlayers].find(p => p.id === id);
+        if (!player) return null;
+        
+        const newPlayer: Player = {
+          id,
+          name: player.name,
+          scores: player.scores,
+          netScores: player.netScores,
+          avatar: player.avatar,
+          gender: player.gender,
+          handicap: player.handicap,
+          phone: player.phone,
+          email: player.email,
+          isGuest: player.isGuest,
+        };
+        
+        return newPlayer;
+      }).filter((player): player is Player => player !== null);
+
+      // Handle competitive options
+      const competitiveOptions = selectedCompetitiveOption ? {
+        type: selectedCompetitiveOption,
+        target: selectedCompetitiveOption === 'last-round' ? 'last' :
+                selectedCompetitiveOption === 'course-average' ? 'average' :
+                selectedCompetitiveOption === 'best-round' ? 'best' :
+                selectedCompetitiveOption === 'best-by-hole' ? 'best-hole' :
+                selectedCompetitiveOption === 'course-record' ? 'record' : 'none'
+      } : undefined;
+
       router.push({
-        pathname: '/active-round' as any,
+        pathname: '/hole-view' as any,
         params: {
           ...params,
           settings: JSON.stringify({
@@ -250,30 +268,29 @@ export default function AddPlayersScreen({
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Add Players</Text>
+        <TouchableOpacity
+          style={styles.skipButton}
+          onPress={() => {
+            if (isModal && onClose) {
+              onClose();
+            } else {
+              router.push({
+                pathname: '/hole-view' as any,
+                params: {
+                  ...params,
+                  settings: JSON.stringify({
+                    ...settings,
+                    players: [],
+                    competitiveOptions: undefined,
+                  }),
+                },
+              });
+            }
+          }}
+        >
+          <Text style={styles.skipButtonText}>Skip</Text>
+        </TouchableOpacity>
       </View>
-
-      <TouchableOpacity
-        style={styles.skipButton}
-        onPress={() => {
-          if (isModal && onClose) {
-            onClose();
-          } else {
-            router.push({
-              pathname: '/active-round' as any,
-              params: {
-                ...params,
-                settings: JSON.stringify({
-                  ...settings,
-                  players: [],
-                  competitiveOptions: undefined,
-                }),
-              },
-            });
-          }
-        }}
-      >
-        <Text style={styles.skipButtonText}>Skip Adding Players</Text>
-      </TouchableOpacity>
 
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
@@ -356,12 +373,8 @@ export default function AddPlayersScreen({
           {[...selectedPlayers].map(renderSelectedPlayerAvatar)}
         </ScrollView>
         <TouchableOpacity
-          style={[
-            styles.startButton,
-            selectedPlayers.size === 0 && styles.startButtonDisabled,
-          ]}
+          style={styles.startButton}
           onPress={handleStartRound}
-          disabled={selectedPlayers.size === 0}
         >
           <Text style={styles.startButtonText}>
             {isModal ? "Add to Round" : "Start Round"}
@@ -380,6 +393,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -520,9 +534,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-  startButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
   startButtonText: {
     color: '#fff',
     fontSize: 16,
@@ -588,12 +599,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   skipButton: {
-    padding: 12,
-    backgroundColor: '#F5F5F5',
-    marginHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 8,
-    alignItems: 'center',
+    padding: 8,
   },
   skipButtonText: {
     fontSize: 16,
