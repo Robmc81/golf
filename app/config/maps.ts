@@ -56,7 +56,7 @@ export const HOLE_COORDINATES: Record<number, HoleCoordinates> = {
     latitude: 33.744054,
     longitude: -84.319206,
     altitude: 0.0001,
-    heading: 243.03,
+    heading: 327.36,
     tilt: 22.59,
     tee: {
       latitude: 33.744054,

@@ -139,8 +139,18 @@ export default function HoleViewScreen() {
         },
         heading: holeCoordinates.heading,
         pitch: holeCoordinates.tilt,
-        altitude: holeCoordinates.altitude || 0.0001, // Controls zoom with default
+        altitude: holeCoordinates.altitude || 0.0001,
       });
+
+      // Update debug info with new coordinates and heading
+      setDebugInfo(prev => ({
+        ...prev,
+        latitude: holeCoordinates.latitude,
+        longitude: holeCoordinates.longitude,
+        heading: holeCoordinates.heading,
+        pitch: holeCoordinates.tilt,
+        altitude: holeCoordinates.altitude || 0.0001,
+      }));
     }
   }, [holeNumber]); // Runs when holeNumber changes
 
@@ -152,12 +162,18 @@ export default function HoleViewScreen() {
   /** Prevent UI lag by delaying region updates **/
   const handleRegionChange = (region: any) => {
     setTimeout(() => {
-      setDebugInfo(prev => ({
-        ...prev,
-        latitude: region.latitude,
-        longitude: region.longitude,
-        altitude: Math.log2(40075016.685578488 / (region.latitudeDelta * 256)) || 0.0001, // Calculate zoom with fallback
-      }));
+      if (mapRef.current) {
+        mapRef.current.getCamera().then((camera) => {
+          setDebugInfo(prev => ({
+            ...prev,
+            latitude: region.latitude,
+            longitude: region.longitude,
+            altitude: Math.log2(40075016.685578488 / (region.latitudeDelta * 256)) || 0.0001,
+            heading: camera.heading,
+            pitch: camera.pitch,
+          }));
+        });
+      }
     }, 500); // Delay to reduce frequent updates
   };
 
