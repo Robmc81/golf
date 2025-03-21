@@ -334,13 +334,16 @@ export default function HoleViewScreen() {
           <Text style={styles.enterScoreText}>Enter Score</Text>
         </TouchableOpacity>
 
-        {holeNumber < 18 ? (
-          <TouchableOpacity style={styles.nextHoleButton} onPress={handleNextHole}>
-            <Ionicons name="chevron-forward" size={24} color="white" />
+        {holeNumber === 9 ? (
+          <TouchableOpacity 
+            style={styles.nextHoleButton} 
+            onPress={handleBackToScorecard}
+          >
+            <Text style={styles.bottomButtonText}>End Round</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.nextHoleButton} onPress={handleEndRound}>
-            <Text style={styles.bottomButtonText}>End Round</Text>
+          <TouchableOpacity style={styles.nextHoleButton} onPress={handleNextHole}>
+            <Ionicons name="chevron-forward" size={24} color="white" />
           </TouchableOpacity>
         )}
       </View>
@@ -524,49 +527,63 @@ export default function HoleViewScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.nextHolePrompt}>
             <Text style={styles.nextHoleTitle}>Scores Saved!</Text>
-            <Text style={styles.nextHoleText}>Would you like to continue to the next hole?</Text>
-            <View style={styles.nextHoleButtons}>
-              <TouchableOpacity 
-                style={[styles.nextHolePromptButton, styles.nextHolePrimary]}
-                onPress={() => {
-                  setShowNextHolePrompt(false);
-                  handleNextHole();
-                }}
-              >
-                <Text style={[styles.nextHoleButtonText, styles.nextHolePrimaryText]}>Next Hole</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.nextHolePromptButton, styles.nextHoleSecondary]}
-                onPress={() => {
-                  setShowNextHolePrompt(false);
-                  router.replace({
-                    pathname: "/scorecard",
-                    params: {
-                      holeNumber: holeNumber.toString()
-                    }
-                  });
-                }}
-              >
-                <Text style={[styles.nextHoleButtonText, styles.nextHoleSecondaryText]}>View Scorecard</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.nextHolePromptButton, styles.nextHoleSecondary]}
-                onPress={() => {
-                  setShowNextHolePrompt(false);
-                  if (holeNumber > 1) {
-                    router.replace({
-                      pathname: "/hole-view",
-                      params: {
-                        holeNumber: (holeNumber - 1).toString(),
-                        ...(params.courseId ? { courseId: params.courseId } : {})
+            {holeNumber === 9 ? (
+              <>
+                <Text style={styles.nextHoleText}>You've completed all 9 holes at Charlie Yates Golf Course!</Text>
+                <View style={styles.nextHoleButtons}>
+                  <TouchableOpacity 
+                    style={[styles.nextHolePromptButton, styles.nextHolePrimary]}
+                    onPress={() => {
+                      setShowNextHolePrompt(false);
+                      handleBackToScorecard();
+                    }}
+                  >
+                    <Text style={[styles.nextHoleButtonText, styles.nextHolePrimaryText]}>View Scorecard</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.nextHoleText}>Would you like to continue to the next hole?</Text>
+                <View style={styles.nextHoleButtons}>
+                  <TouchableOpacity 
+                    style={[styles.nextHolePromptButton, styles.nextHolePrimary]}
+                    onPress={() => {
+                      setShowNextHolePrompt(false);
+                      handleNextHole();
+                    }}
+                  >
+                    <Text style={[styles.nextHoleButtonText, styles.nextHolePrimaryText]}>Next Hole</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.nextHolePromptButton, styles.nextHoleSecondary]}
+                    onPress={() => {
+                      setShowNextHolePrompt(false);
+                      handleBackToScorecard();
+                    }}
+                  >
+                    <Text style={[styles.nextHoleButtonText, styles.nextHoleSecondaryText]}>View Scorecard</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.nextHolePromptButton, styles.nextHoleSecondary]}
+                    onPress={() => {
+                      setShowNextHolePrompt(false);
+                      if (holeNumber > 1) {
+                        router.replace({
+                          pathname: "/hole-view",
+                          params: {
+                            holeNumber: (holeNumber - 1).toString(),
+                            ...(params.courseId ? { courseId: params.courseId } : {})
+                          }
+                        });
                       }
-                    });
-                  }
-                }}
-              >
-                <Text style={[styles.nextHoleButtonText, styles.nextHoleSecondaryText]}>Previous Hole</Text>
-              </TouchableOpacity>
-            </View>
+                    }}
+                  >
+                    <Text style={[styles.nextHoleButtonText, styles.nextHoleSecondaryText]}>Previous Hole</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
