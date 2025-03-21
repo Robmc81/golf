@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Dimensions, TouchableOpacity, Text, ScrollView, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import MapView, { Marker, Camera } from 'react-native-maps';
-import { CHARLIE_YATES_COORDINATES, HOLE_COORDINATES } from './config/maps';
+import { HOLE_COORDINATES } from './config/maps';
 import { Ionicons } from '@expo/vector-icons';
 
 interface HoleViewParams { 
@@ -11,18 +11,10 @@ interface HoleViewParams {
   settings?: string;
 } 
 
-interface MapDebugInfo {
-  latitude: number;
-  longitude: number;
-  altitude: number;
-  heading: number;
-  pitch: number;
-}
-
 interface HoleCoordinates {
   latitude: number;
   longitude: number;
-  altitude?: number;
+  altitude: number;
   heading: number;
   tilt: number;
   tee: {
@@ -80,17 +72,9 @@ export default function HoleViewScreen() {
   const params = useLocalSearchParams() as HoleViewParams;
   const settings = params.settings ? JSON.parse(params.settings as string) : null;
   const holeNumber = parseInt(params.holeNumber || '1');
-  const holeCoordinates = HOLE_COORDINATES[holeNumber as keyof typeof HOLE_COORDINATES] || CHARLIE_YATES_COORDINATES as HoleCoordinates;
+  const holeCoordinates = HOLE_COORDINATES[holeNumber as keyof typeof HOLE_COORDINATES];
   
   const [mapType, setMapType] = useState<'standard' | 'satellite'>('satellite');
-  const [debugInfo, setDebugInfo] = useState<MapDebugInfo>({
-    latitude: holeCoordinates.latitude,
-    longitude: holeCoordinates.longitude,
-    altitude: holeCoordinates.altitude || 0.0001, // Default altitude for zoom
-    heading: holeCoordinates.heading,
-    pitch: holeCoordinates.tilt,
-  });
-
   const mapRef = useRef<MapView>(null);
 
   const [showGreenView, setShowGreenView] = useState(false);
@@ -107,74 +91,68 @@ export default function HoleViewScreen() {
   const [scores, setScores] = useState<Record<string, ScoreEntry>>({});
   const [showNextHolePrompt, setShowNextHolePrompt] = useState(false);
 
-  /** Ensure the map initializes with the correct 3D heading & tilt **/
+  // Update the state type to make altitude optional
+  const [debugInfo, setDebugInfo] = useState({
+    latitude: holeCoordinates.latitude,
+    longitude: holeCoordinates.longitude,
+    latitudeDelta: holeCoordinates.latitudeDelta,
+    longitudeDelta: holeCoordinates.longitudeDelta,
+    heading: holeCoordinates.heading,
+    altitude: null,  // or undefined
+  });
+
+  /** Initialize map view when ready **/
   const handleMapReady = () => {
     if (mapRef.current) {
-      mapRef.current.animateCamera({
+      const exactValues = {
+        latitude: holeCoordinates.latitude,
+        longitude: holeCoordinates.longitude,
+        latitudeDelta: holeCoordinates.latitudeDelta,
+        longitudeDelta: holeCoordinates.longitudeDelta,
+      };
+
+      // Set exact values from maps.ts
+      setDebugInfo({
+        ...exactValues,
+        heading: holeCoordinates.heading,
+        altitude: null,
+      });
+
+      // Use exact same values for animation
+      mapRef.current.animateToRegion(exactValues, 1000);
+
+      // Set the camera heading and pitch separately
+      mapRef.current.setCamera({
         center: {
           latitude: holeCoordinates.latitude,
           longitude: holeCoordinates.longitude,
         },
-        heading: holeCoordinates.heading, // Rotate map correctly
-        pitch: holeCoordinates.tilt, // Ensure 3D effect
-        altitude: holeCoordinates.altitude || 0.0001, // Controls zoom level with default
-      });
-
-      setDebugInfo(prev => ({
-        ...prev,
         heading: holeCoordinates.heading,
         pitch: holeCoordinates.tilt,
-        altitude: holeCoordinates.altitude || 0.0001,
-      }));
+      });
     }
   };
 
-  /** Smoothly animate camera when the user changes holes **/
+  /** Update view when hole changes **/
   useEffect(() => {
-    if (mapRef.current) {
-      mapRef.current.animateCamera({
-        center: {
-          latitude: holeCoordinates.latitude,
-          longitude: holeCoordinates.longitude,
-        },
-        heading: holeCoordinates.heading,
-        pitch: holeCoordinates.tilt,
-        altitude: holeCoordinates.altitude || 0.0001,
-      });
-
-      // Update debug info with new coordinates and heading
-      setDebugInfo(prev => ({
-        ...prev,
-        latitude: holeCoordinates.latitude,
-        longitude: holeCoordinates.longitude,
-        heading: holeCoordinates.heading,
-        pitch: holeCoordinates.tilt,
-        altitude: holeCoordinates.altitude || 0.0001,
-      }));
-    }
-  }, [holeNumber]); // Runs when holeNumber changes
+    handleMapReady();
+  }, [holeNumber]);
 
   /** Toggle between Standard and Satellite views **/
   const toggleMapType = () => {
     setMapType(prev => prev === 'standard' ? 'satellite' : 'standard');
   };
 
-  /** Prevent UI lag by delaying region updates **/
+  /** Update debug info when region changes **/
   const handleRegionChange = (region: any) => {
-    setTimeout(() => {
-      if (mapRef.current) {
-        mapRef.current.getCamera().then((camera) => {
-          setDebugInfo(prev => ({
-            ...prev,
-            latitude: region.latitude,
-            longitude: region.longitude,
-            altitude: Math.log2(40075016.685578488 / (region.latitudeDelta * 256)) || 0.0001,
-            heading: camera.heading,
-            pitch: camera.pitch,
-          }));
-        });
-      }
-    }, 500); // Delay to reduce frequent updates
+    setDebugInfo(prev => ({
+      ...prev,
+      latitude: region.latitude,
+      longitude: region.longitude,
+      latitudeDelta: region.latitudeDelta,
+      longitudeDelta: region.longitudeDelta,
+      heading: region.heading || prev.heading,
+    }));
   };
 
   /** Navigate back to Scorecard **/
@@ -235,10 +213,11 @@ export default function HoleViewScreen() {
 
   const handlePreviousHole = () => {
     if (holeNumber > 1) {
+      const prevHole = holeNumber - 1;
       router.replace({
         pathname: "/hole-view",
         params: {
-          holeNumber: (holeNumber - 1).toString(),
+          holeNumber: prevHole.toString(),
           ...(params.courseId ? { courseId: params.courseId } : {})
         }
       });
@@ -287,26 +266,9 @@ export default function HoleViewScreen() {
       <MapView
         ref={mapRef}
         style={styles.map}
-        initialRegion={{
-          latitude: holeCoordinates.latitude,
-          longitude: holeCoordinates.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        }}
-        camera={{
-          center: {
-            latitude: holeCoordinates.latitude,
-            longitude: holeCoordinates.longitude,
-          },
-          pitch: holeCoordinates.tilt,
-          heading: holeCoordinates.heading,
-          altitude: holeCoordinates.altitude || 0.0001,
-        }}
-        showsUserLocation
-        showsMyLocationButton
         mapType={mapType}
-        onRegionChange={handleRegionChange}
         onMapReady={handleMapReady}
+        onRegionChange={handleRegionChange}
         rotateEnabled={true}
         pitchEnabled={true}
         zoomEnabled={true}
@@ -610,14 +572,16 @@ export default function HoleViewScreen() {
       </Modal>
 
       {/* Debug Panel */}
-      <View style={styles.debugPanel}>
+      <View style={[styles.debugPanel, { zIndex: 999 }]}>
         <ScrollView style={styles.debugScroll}>
-          <Text style={styles.debugTitle}>Map Debug Info</Text>
-          <Text style={styles.debugText}>Latitude: {debugInfo.latitude.toFixed(6)}°</Text>
-          <Text style={styles.debugText}>Longitude: {debugInfo.longitude.toFixed(6)}°</Text>
-          <Text style={styles.debugText}>Altitude (Zoom): {(debugInfo.altitude || 0.0001).toFixed(2)}</Text>
-          <Text style={styles.debugText}>Heading: {debugInfo.heading.toFixed(2)}°</Text>
-          <Text style={styles.debugText}>Pitch: {debugInfo.pitch.toFixed(2)}°</Text>
+          <Text style={styles.debugTitle}>Map Debug Info:</Text>
+          <Text style={styles.debugText}>Hole: {holeNumber}</Text>
+          <Text style={styles.debugText}>Latitude: {debugInfo.latitude}</Text>
+          <Text style={styles.debugText}>Longitude: {debugInfo.longitude}</Text>
+          <Text style={styles.debugText}>LatitudeDelta: {debugInfo.latitudeDelta}</Text>
+          <Text style={styles.debugText}>LongitudeDelta: {debugInfo.longitudeDelta}</Text>
+          <Text style={styles.debugText}>Heading: {debugInfo.heading}°</Text>
+          <Text style={styles.debugText}>Altitude: {debugInfo.altitude}</Text>
         </ScrollView>
       </View>
     </View>
@@ -767,14 +731,26 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 100,
     right: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     borderRadius: 8,
     padding: 12,
     maxWidth: 200,
+    zIndex: 999,
   },
-  debugScroll: { maxHeight: 200 },
-  debugTitle: { color: 'white', fontSize: 14, fontWeight: '600', marginBottom: 8 },
-  debugText: { color: 'white', fontSize: 12, marginBottom: 4 },
+  debugScroll: {
+    maxHeight: 200,
+  },
+  debugTitle: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  debugText: {
+    color: 'white',
+    fontSize: 12,
+    marginBottom: 4,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
