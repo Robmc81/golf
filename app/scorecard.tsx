@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AddPlayerModal from './add-player-modal';
+import { supabase } from '../lib/supabase';
 
 const mockPlayers = [
   {
@@ -81,6 +82,28 @@ interface RoundSummaryProps {
     oldScore: number | null;
     newScore: number;
   }[];
+}
+
+interface DatabaseRound {
+  id: string;
+  course_name: string;
+  tee_name: string;
+  tee_color: string;
+  rating: number;
+  slope: number;
+  date_played: string;
+  status: 'in_progress' | 'completed';
+}
+
+interface DatabaseScore {
+  id: string;
+  round_id: string;
+  player_id: string;
+  hole_number: number;
+  gross_score: number;
+  net_score: number;
+  created_at: string;
+  updated_at: string;
 }
 
 function ScoreEditModal({ visible, onClose, onSave, players, currentHole, currentScores }: ScoreEditModalProps) {
@@ -347,6 +370,8 @@ export default function Scorecard({
     oldScore: number | null;
     newScore: number;
   }[]>([]);
+  const [roundId, setRoundId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Calculate gross and net scores for the selected player
   const selectedPlayer = players[selectedPlayerIndex];
@@ -377,37 +402,71 @@ export default function Scorecard({
     setShowScoreEditModal(true);
   };
 
-  const handleSaveScores = (scores: { [key: string]: number }) => {
-    setPlayers((prev: Player[]) => prev.map((player: Player) => {
-      // Only update the score if this player's ID matches a score in the scores object
-      if (scores[player.id] !== undefined) {
-        const newScores = [...player.scores];
-        const score = scores[player.id];
-        const oldScore = player.scores[currentHole - 1];
-        
-        // Update only the current hole's score for this specific player
-        newScores[currentHole - 1] = score;
+  const handleSaveScores = async (scores: { [key: string]: number }) => {
+    if (!roundId) return;
 
-        // Track modifications if round has ended
-        if (roundEndTime) {
-          setScoreModifications(prev => [...prev, {
-            timestamp: new Date(),
-            playerId: player.id,
-            playerName: player.name,
-            holeNumber: currentHole,
-            oldScore,
-            newScore: score
-          }]);
+    try {
+      const scoresToInsert = Object.entries(scores).map(([playerId, score]) => ({
+        round_id: roundId,
+        player_id: playerId,
+        hole_number: currentHole,
+        gross_score: score,
+        net_score: score - (players.find(p => p.id === playerId)?.handicap || 0),
+      }));
+
+      const { error } = await supabase
+        .from('scores')
+        .upsert(scoresToInsert, {
+          onConflict: 'round_id,player_id,hole_number'
+        });
+
+      if (error) throw error;
+
+      // Update local state after successful save
+      setPlayers(prev => prev.map(player => {
+        if (scores[player.id] !== undefined) {
+          const newScores = [...player.scores];
+          newScores[currentHole - 1] = scores[player.id];
+          return {
+            ...player,
+            scores: newScores,
+          };
         }
-        
-        return {
-          ...player,
-          scores: newScores,
-        };
+        return player;
+      }));
+    } catch (error) {
+      console.error('Error saving scores:', error);
+    }
+  };
+
+  // Add function to load existing scores
+  const loadExistingScores = async (roundId: string) => {
+    try {
+      const { data: scores, error } = await supabase
+        .from('scores')
+        .select('*')
+        .eq('round_id', roundId);
+
+      if (error) throw error;
+
+      // Update players with existing scores
+      if (scores) {
+        setPlayers(prev => prev.map(player => {
+          const playerScores = [...player.scores];
+          scores
+            .filter(score => score.player_id === player.id)
+            .forEach(score => {
+              playerScores[score.hole_number - 1] = score.gross_score;
+            });
+          return {
+            ...player,
+            scores: playerScores,
+          };
+        }));
       }
-      // Return player unchanged if no score update
-      return player;
-    }));
+    } catch (error) {
+      console.error('Error loading scores:', error);
+    }
   };
 
   // Add new function to check for missing scores
@@ -417,13 +476,26 @@ export default function Scorecard({
     );
   };
 
-  // Update handleFinishRound
-  const handleFinishRound = () => {
+  // Modify handleFinishRound to update round status
+  const handleFinishRound = async () => {
+    if (!roundId) return;
+
     if (hasMissingScores()) {
       setShowMissingScoresAlert(true);
     } else {
-      setRoundEndTime(new Date());
-      setShowSummary(true);
+      try {
+        const { error } = await supabase
+          .from('rounds')
+          .update({ status: 'completed' })
+          .eq('id', roundId);
+
+        if (error) throw error;
+        
+        setRoundEndTime(new Date());
+        setShowSummary(true);
+      } catch (error) {
+        console.error('Error completing round:', error);
+      }
     }
   };
 
@@ -451,6 +523,59 @@ export default function Scorecard({
       }
     });
   };
+
+  // Add this function to create a new round
+  const createRound = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('rounds')
+        .insert({
+          course_name: courseName,
+          tee_name: teeName,
+          tee_color: teeColor,
+          rating: rating,
+          slope: slope,
+          date_played: new Date().toISOString(),
+          status: 'in_progress'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setRoundId(data.id);
+      return data.id;
+    } catch (error) {
+      console.error('Error creating round:', error);
+      return null;
+    }
+  };
+
+  // Add useEffect to initialize round
+  useEffect(() => {
+    const initializeRound = async () => {
+      setIsLoading(true);
+      try {
+        // Check for existing round ID in params
+        const existingRoundId = params.roundId as string;
+        
+        if (existingRoundId) {
+          setRoundId(existingRoundId);
+          await loadExistingScores(existingRoundId);
+        } else {
+          const newRoundId = await createRound();
+          if (newRoundId) {
+            setRoundId(newRoundId);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing round:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeRound();
+  }, []);
 
   // If showing summary, render the RoundSummary component
   if (showSummary) {
@@ -799,6 +924,15 @@ export default function Scorecard({
       </Modal>
     </View>
   );
+
+  // Add loading state to render
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading scorecard...</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1399,5 +1533,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     marginLeft: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 

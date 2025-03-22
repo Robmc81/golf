@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
 import { colors } from './constants/colors';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { SessionProvider } from './contexts/SessionContext';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -28,6 +29,8 @@ export default function RootLayout(): JSX.Element | null {
     ...FontAwesome.font,
   });
 
+  const colorScheme = useColorScheme();
+
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
@@ -44,50 +47,44 @@ export default function RootLayout(): JSX.Element | null {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <RootLayoutNav />
-    </QueryClientProvider>
-  );
-}
-
-function RootLayoutNav(): JSX.Element {
-  const colorScheme = useColorScheme();
-
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen 
-          name="modal" 
-          options={{ 
-            presentation: 'modal', 
-            headerShown: true 
-          }} 
-        />
-        <Stack.Screen name="post/[id]" />
-        <Stack.Screen name="profile/[id]" />
-        <Stack.Screen
-          name="course-details"
-          options={{
-            title: 'Course Details',
-            headerStyle: {
-              backgroundColor: colors.background,
-            },
-            headerTintColor: colors.text,
-          }}
-        />
-        <Stack.Screen
-          name="hole-view"
-          options={{
-            title: 'Hole View',
-            headerStyle: {
-              backgroundColor: colors.background,
-            },
-            headerTintColor: colors.text,
-          }}
-        />
-      </Stack>
-    </ThemeProvider>
+    <SessionProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen 
+              name="modal" 
+              options={{ 
+                presentation: 'modal', 
+                headerShown: true 
+              }} 
+            />
+            <Stack.Screen name="post/[id]" />
+            <Stack.Screen name="profile/[id]" />
+            <Stack.Screen
+              name="course-details"
+              options={{
+                title: 'Course Details',
+                headerStyle: {
+                  backgroundColor: colors.background,
+                },
+                headerTintColor: colors.text,
+              }}
+            />
+            <Stack.Screen
+              name="hole-view"
+              options={{
+                title: 'Hole View',
+                headerStyle: {
+                  backgroundColor: colors.background,
+                },
+                headerTintColor: colors.text,
+              }}
+            />
+          </Stack>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </SessionProvider>
   );
 }
