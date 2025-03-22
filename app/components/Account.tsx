@@ -20,6 +20,7 @@ import { useSessionContext } from '../contexts/SessionContext'
 import { useRouter } from 'expo-router'
 import { SessionProvider } from '../contexts/SessionContext'
 import Auth from './Auth'
+import { Ionicons } from '@expo/vector-icons'
 
 interface Profile {
   id: string
@@ -47,7 +48,8 @@ interface Profile {
 }
 
 export default function Account() {
-  const [session] = useSessionContext()
+  const [session, setSession] = useSessionContext()
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<Profile>({
     id: '',
@@ -73,7 +75,6 @@ export default function Account() {
     twitter: null,
     updated_at: null
   })
-  const router = useRouter()
 
   useEffect(() => {
     if (session?.user) {
@@ -292,12 +293,19 @@ export default function Account() {
 
   async function signOut() {
     try {
+      setLoading(true)
       const { error } = await supabase.auth.signOut()
       if (error) throw error
+      
+      // Navigate to Auth component
+      router.replace('/components/Auth')
     } catch (error) {
+      console.error('Error signing out:', error)
       if (error instanceof Error) {
         Alert.alert('Error', error.message)
       }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -315,6 +323,17 @@ export default function Account() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoid}
       >
+        <View style={styles.headerContainer}>
+          <TouchableOpacity 
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Ionicons name="chevron-back" size={24} color="#007AFF" />
+            <Text style={styles.backButtonText}>Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Profile</Text>
+        </View>
+
         <ScrollView style={styles.scrollView}>
           <View style={styles.header}>
             <TouchableOpacity onPress={pickImage} style={styles.avatarContainer}>
@@ -495,6 +514,30 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#C6C6C8',
+    backgroundColor: '#FFFFFF',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: '#007AFF',
+    fontSize: 17,
+    marginLeft: 4,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '600',
+    marginRight: 32,
   },
   header: {
     alignItems: 'center',
