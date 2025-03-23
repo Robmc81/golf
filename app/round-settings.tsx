@@ -101,7 +101,36 @@ export default function RoundSettingsScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('No user found');
 
-      // Create the round with the correct structure
+      // First check for an active round
+      const { data: activeRound, error: activeRoundError } = await supabase
+        .from('charlie_yates_scorecards')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('active', true)
+        .single();
+
+      if (activeRoundError && activeRoundError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        console.error('Error checking active round:', activeRoundError);
+        throw activeRoundError;
+      }
+
+      // If there's an active round, navigate to it
+      if (activeRound) {
+        console.log('Found active round:', activeRound);
+        router.push({
+          pathname: '/hole-view',
+          params: {
+            roundId: activeRound.id,
+            courseName: activeRound.course,
+            teeName: activeRound.tee_box,
+            courseId: selectedCourse._id,
+            holeNumber: '1'
+          }
+        });
+        return;
+      }
+
+      // No active round found, create a new one with existing logic
       const { data: roundData, error } = await supabase
         .from('charlie_yates_scorecards')
         .insert({
@@ -111,6 +140,7 @@ export default function RoundSettingsScreen() {
           weather_conditions: null,
           playing_partners: [],
           tournament_round: false,
+          active: true, // Set the new round as active
           // Initialize all hole data
           hole_1_score: null,
           hole_1_putts: null,
@@ -173,16 +203,16 @@ export default function RoundSettingsScreen() {
         throw error;
       }
 
-    router.push({
-      pathname: '/hole-view',
-      params: {
-        roundId: roundData.id,
-        courseName: params.courseName,
-        teeName: selectedTee?.color || 'Black',
-        courseId: selectedCourse._id,
-        holeNumber: startingHole.toString()
-      }
-    });
+      router.push({
+        pathname: '/hole-view',
+        params: {
+          roundId: roundData.id,
+          courseName: params.courseName,
+          teeName: selectedTee?.color || 'Black',
+          courseId: selectedCourse._id,
+          holeNumber: startingHole.toString()
+        }
+      });
 
     } catch (error) {
       console.error('Error creating round:', error);
