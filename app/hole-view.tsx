@@ -160,9 +160,7 @@ export default function HoleViewScreen() {
     router.push({
       pathname: "/scorecard",
       params: {
-        courseName: "Charlie Yates",
-        teeName: "Black",
-        ...(params.courseId ? { courseId: params.courseId } : {})
+        loadActive: "true"
       }
     });
   };
@@ -235,10 +233,8 @@ export default function HoleViewScreen() {
     router.push({
       pathname: "/scorecard",
       params: {
-        courseName: "Charlie Yates",
-        teeName: "Black",
-        endRound: "true",
-        ...(params.courseId ? { courseId: params.courseId } : {})
+        loadActive: "true",
+        endRound: "true"
       }
     });
   };
