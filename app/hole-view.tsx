@@ -157,7 +157,14 @@ export default function HoleViewScreen() {
 
   /** Navigate back to Scorecard **/
   const handleBackToScorecard = () => {
-    router.push("/active-round");
+    router.push({
+      pathname: "/scorecard",
+      params: {
+        courseName: "Charlie Yates",
+        teeName: "Black",
+        ...(params.courseId ? { courseId: params.courseId } : {})
+      }
+    });
   };
 
   /** Handle score entry **/
@@ -225,9 +232,11 @@ export default function HoleViewScreen() {
   };
 
   const handleEndRound = () => {
-    router.replace({
+    router.push({
       pathname: "/scorecard",
       params: {
+        courseName: "Charlie Yates",
+        teeName: "Black",
         endRound: "true",
         ...(params.courseId ? { courseId: params.courseId } : {})
       }

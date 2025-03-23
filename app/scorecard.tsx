@@ -1,967 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  SafeAreaView,
-  Dimensions,
-  Modal,
-  TextInput,
-} from 'react-native';
+import { supabase } from './utils/supabaseClient';
+import { Text, View, SafeAreaView, ScrollView, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import AddPlayerModal from './add-player-modal';
-import { supabase } from '../lib/supabase';
-
-const mockPlayers = [
-  {
-    id: 'mock-player-1',
-    name: 'R. McFadden',
-    handicap: 20,
-    scores: [4, 5, 3, 4, 5, 4, 3, 4, 5, 4, 5, 3, 4, 5, 4, 3, 4, 5],
-    netScores: [-16, -15, -17, -16, -15, -16, -17, -16, -15, -16, -15, -17, -16, -15, -16, -17, -16, -15],
-  },
-];
 
 interface Player {
   id: string;
-  name: string;
-  avatar?: string;
-  handicap?: number;
+  username: string;
   scores: (number | null)[];
-  netScores: (number | null)[];
 }
 
 interface Props {
-  courseName: string;
-  teeName: string;
-  teeColor: string;
-  rating: number;
-  slope: number;
-  holes: {
-    number: number;
-    par: number;
-    handicap: number;
-  }[];
-  players: Player[];
-  orientation?: 'vertical' | 'horizontal';
-  currentHole?: number;
-  competitiveOptions?: {
-    type: string;
-    target: string;
-  };
-}
-
-interface ScoreEditModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onSave: (scores: { [key: string]: number }) => void;
-  players: Player[];
-  currentHole: number;
-  currentScores: { [key: string]: number };
-}
-
-interface RoundSummaryProps {
-  players: Player[];
-  holes: {
-    number: number;
-    par: number;
-    handicap: number;
-  }[];
-  onBackToScorecard: () => void;
-  onFinishRound: () => void;
-  endTime: Date;
-  modifications: {
-    timestamp: Date;
-    playerId: string;
-    playerName: string;
-    holeNumber: number;
-    oldScore: number | null;
-    newScore: number;
-  }[];
+  courseName?: string;
+  teeName?: string;
+  roundId?: string;
 }
 
 interface DatabaseRound {
   id: string;
-  course_name: string;
-  tee_name: string;
-  tee_color: string;
-  rating: number;
-  slope: number;
+  user_id: string;
   date_played: string;
+  course: string;
+  tee_box: string;
+  weather_conditions: string | null;
+  playing_partners: string[] | null;
+  total_score: number | null;
+  total_putts: number | null;
+  total_fairways: number | null;
+  total_gir: number | null;
   status: 'in_progress' | 'completed';
+  created_at: string;
+  updated_at: string;
 }
 
 interface DatabaseScore {
   id: string;
   round_id: string;
-  player_id: string;
   hole_number: number;
-  gross_score: number;
-  net_score: number;
+  score: number;
+  putts: number | null;
+  fairway_hit: boolean | null;
+  gir: boolean | null;
   created_at: string;
   updated_at: string;
 }
 
-function ScoreEditModal({ visible, onClose, onSave, players, currentHole, currentScores }: ScoreEditModalProps) {
-  const [scores, setScores] = useState<{ [key: string]: number }>({});
-
-  // Update scores when modal becomes visible or currentScores changes
-  React.useEffect(() => {
-    // Reset scores when modal becomes visible
-    if (visible) {
-      setScores(currentScores);
-    }
-  }, [visible, currentScores]);
-
-  const handleScoreChange = (playerId: string, text: string) => {
-    const score = parseInt(text) || 0;
-    // Only update the score for the specific player
-    setScores(prev => ({ ...prev, [playerId]: score }));
-  };
-
-  const handleSave = () => {
-    // Only save scores that have been entered and are valid
-    const scoresToSave = Object.entries(scores).reduce((acc, [playerId, score]) => {
-      if (score > 0) {
-        acc[playerId] = score;
-      }
-      return acc;
-    }, {} as { [key: string]: number });
-    
-    onSave(scoresToSave);
-    onClose();
-  };
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Hole {currentHole} Scores</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#000" />
-            </TouchableOpacity>
-          </View>
-          
-          {players.map((player) => (
-            <View key={player.id} style={styles.scoreInputRow}>
-              <View style={styles.playerInfo}>
-                {player.avatar ? (
-                  <Image source={{ uri: player.avatar }} style={styles.modalAvatar} />
-                ) : (
-                  <View style={styles.modalAvatarPlaceholder}>
-                    <Text style={styles.modalAvatarText}>
-                      {player.name.split(' ').map((n) => n[0]).join('')}
-                    </Text>
-                  </View>
-                )}
-                <Text style={styles.modalPlayerName}>{player.name}</Text>
-              </View>
-              <TextInput
-                style={styles.scoreInput}
-                value={scores[player.id]?.toString() || ''}
-                onChangeText={(text) => handleScoreChange(player.id, text)}
-                keyboardType="number-pad"
-                maxLength={2}
-              />
-            </View>
-          ))}
-          
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>Save Scores</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-function RoundSummary({ players, holes, onBackToScorecard, onFinishRound, endTime, modifications }: RoundSummaryProps) {
-  const totalPar = holes.reduce((sum, hole) => sum + hole.par, 0);
-
-  // Format end time
-  const formattedEndTime = endTime.toLocaleString();
-
-  // Calculate additional stats for each player
-  const playerStats = players.map(player => {
-    const grossScore = player.scores.reduce((sum: number, score) => sum + (score || 0), 0);
-    const netScore = player.netScores.reduce((sum: number, score) => sum + (score || 0), 0);
-    const scoreToPar = grossScore - totalPar;
-    
-    // Calculate fairways hit (assuming even holes are par 4/5)
-    const fairwaysHit = player.scores.filter((score, index) => 
-      holes[index].par >= 4 && score !== null
-    ).length;
-    const totalFairways = holes.filter(hole => hole.par >= 4).length;
-    const fairwayPercentage = totalFairways > 0 ? (fairwaysHit / totalFairways) * 100 : 0;
-
-    // Calculate greens in regulation (assuming par 3 = 1, par 4 = 2, par 5 = 3)
-    const greensInRegulation = player.scores.filter((score, index) => {
-      const par = holes[index].par;
-      return score !== null && score <= par + 2;
-    }).length;
-    const girPercentage = (greensInRegulation / holes.length) * 100;
-
-    // Calculate putts per hole (assuming score - par + 2 is putts)
-    const totalPutts = player.scores.reduce((sum: number, score, index) => {
-      if (score === null) return sum;
-      const par = holes[index].par;
-      return sum + (score - par + 2);
-    }, 0);
-    const averagePutts = totalPutts / holes.length;
-
-    return {
-      player,
-      grossScore,
-      netScore,
-      scoreToPar,
-      fairwayPercentage,
-      girPercentage,
-      averagePutts,
-    };
-  });
-
-  return (
-    <SafeAreaView style={styles.summaryContainer}>
-      <View style={styles.summaryHeader}>
-        <Text style={styles.summaryTitle}>Round Summary</Text>
-        <Text style={styles.summaryEndTime}>Ended: {formattedEndTime}</Text>
-        <View style={styles.summaryNavigation}>
-          <TouchableOpacity 
-            style={styles.navButton}
-            onPress={onBackToScorecard}
-          >
-            <Ionicons name="arrow-back" size={24} color="#007AFF" />
-            <Text style={styles.navButtonText}>Back to Scorecard</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.navButton, styles.finishButton]}
-            onPress={onFinishRound}
-          >
-            <Text style={styles.navButtonText}>Finish Round</Text>
-            <Ionicons name="checkmark-circle" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <ScrollView style={styles.summaryScroll}>
-        {playerStats.map(({ player, grossScore, netScore, scoreToPar, fairwayPercentage, girPercentage, averagePutts }) => (
-          <View key={player.id} style={styles.summaryPlayerCard}>
-            <View style={styles.summaryPlayerHeader}>
-              <View style={styles.playerInfo}>
-                {player.avatar ? (
-                  <Image source={{ uri: player.avatar }} style={styles.modalAvatar} />
-                ) : (
-                  <View style={styles.modalAvatarPlaceholder}>
-                    <Text style={styles.modalAvatarText}>
-                      {player.name.split(' ').map((n) => n[0]).join('')}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.summaryPlayerInfo}>
-                  <Text style={styles.summaryPlayerName}>{player.name}</Text>
-                  <Text style={styles.summaryPlayerHandicap}>Handicap: {player.handicap || 0}</Text>
-                </View>
-              </View>
-              <View style={styles.summaryScores}>
-                <Text style={styles.summaryScore}>Gross: {grossScore}</Text>
-                <Text style={styles.summaryScore}>Net: {netScore}</Text>
-                <Text style={[styles.summaryScore, scoreToPar > 0 ? styles.overPar : styles.underPar]}>
-                  {scoreToPar > 0 ? '+' : ''}{scoreToPar}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.statsGrid}>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{fairwayPercentage.toFixed(1)}%</Text>
-                <Text style={styles.statLabel}>Fairways Hit</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{girPercentage.toFixed(1)}%</Text>
-                <Text style={styles.statLabel}>GIR</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{averagePutts.toFixed(1)}</Text>
-                <Text style={styles.statLabel}>Avg Putts</Text>
-              </View>
-            </View>
-          </View>
-        ))}
-        
-        {modifications.length > 0 && (
-          <View style={styles.modificationsSection}>
-            <Text style={styles.modificationsTitle}>Score Modifications</Text>
-            {modifications.map((mod, index) => (
-              <View key={index} style={styles.modificationItem}>
-                <Text style={styles.modificationText}>
-                  {mod.playerName} modified hole {mod.holeNumber} from {mod.oldScore || '-'} to {mod.newScore}
-                </Text>
-                <Text style={styles.modificationTime}>
-                  {mod.timestamp.toLocaleString()}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-export default function Scorecard({
-  courseName,
-  teeName,
-  teeColor,
-  rating,
-  slope,
-  holes,
-  players: initialPlayers,
-  orientation = 'vertical',
-  currentHole: initialHole = 1,
-  competitiveOptions,
-}: Props) {
-  const router = useRouter();
-  const params = useLocalSearchParams();
-  const settings = params.settings ? JSON.parse(params.settings as string) : null;
-  
-  // Initialize players with mock player first, then add players from settings
-  const [players, setPlayers] = useState(() => {
-    // Get other players from settings
-    const otherPlayers = (settings?.players || initialPlayers || []).map((player: Player) => ({
-      ...player,
-      scores: Array(holes.length).fill(null),
-      netScores: Array(holes.length).fill(null),
-    }));
-
-    // Create a new array for mock player scores
-    const mockPlayerWithScores = mockPlayers.map(player => ({
-      ...player,
-      scores: Array(holes.length).fill(null), // Always initialize with null scores
-      netScores: Array(holes.length).fill(null), // Always initialize with null scores
-    }));
-
-    // Return array with mock player first, followed by other players
-    return [...mockPlayerWithScores, ...otherPlayers];
-  });
-  const [activeTab, setActiveTab] = useState<'scores' | 'stats'>('scores');
-  const [currentHole, setCurrentHole] = useState(initialHole);
-  const [showScoreEditModal, setShowScoreEditModal] = useState(false);
-  const [editingScores, setEditingScores] = useState<{ [key: string]: number }>({});
-  const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
-  const [selectedPlayerIndex, setSelectedPlayerIndex] = useState(0);
-  const [showSummary, setShowSummary] = useState(false);
-  const [showMissingScoresAlert, setShowMissingScoresAlert] = useState(false);
-  const [roundEndTime, setRoundEndTime] = useState<Date | null>(null);
-  const [scoreModifications, setScoreModifications] = useState<{
-    timestamp: Date;
-    playerId: string;
-    playerName: string;
-    holeNumber: number;
-    oldScore: number | null;
-    newScore: number;
-  }[]>([]);
-  const [roundId, setRoundId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Calculate gross and net scores for the selected player
-  const selectedPlayer = players[selectedPlayerIndex];
-  const grossScore = selectedPlayer?.scores.reduce((sum: number, score: number | null) => sum + (score || 0), 0) || 0;
-  const netScore = grossScore - (selectedPlayer?.handicap || 0);
-
-  const handleAddPlayers = (newPlayers: Player[]) => {
-    // Initialize scores arrays for new players with new arrays for each player
-    const playersWithScores = newPlayers.map(player => ({
-      ...player,
-      scores: Array(holes.length).fill(null),
-      netScores: Array(holes.length).fill(null),
-    }));
-    setPlayers([...players, ...playersWithScores]);
-  };
-
-  const handleHolePress = (holeNumber: number) => {
-    setCurrentHole(holeNumber);
-    // Get current scores for the hole
-    const currentScores = players.reduce((acc: { [key: string]: number }, player: Player) => {
-      const score = player.scores[holeNumber - 1];
-      if (score !== null) {
-        acc[player.id] = score;
-      }
-      return acc;
-    }, {});
-    setEditingScores(currentScores);
-    setShowScoreEditModal(true);
-  };
-
-  const handleSaveScores = async (scores: { [key: string]: number }) => {
-    if (!roundId) return;
-
-    try {
-      const scoresToInsert = Object.entries(scores).map(([playerId, score]) => ({
-        round_id: roundId,
-        player_id: playerId,
-        hole_number: currentHole,
-        gross_score: score,
-        net_score: score - (players.find(p => p.id === playerId)?.handicap || 0),
-      }));
-
-      const { error } = await supabase
-        .from('scores')
-        .upsert(scoresToInsert, {
-          onConflict: 'round_id,player_id,hole_number'
-        });
-
-      if (error) throw error;
-
-      // Update local state after successful save
-      setPlayers(prev => prev.map(player => {
-        if (scores[player.id] !== undefined) {
-          const newScores = [...player.scores];
-          newScores[currentHole - 1] = scores[player.id];
-          return {
-            ...player,
-            scores: newScores,
-          };
-        }
-        return player;
-      }));
-    } catch (error) {
-      console.error('Error saving scores:', error);
-    }
-  };
-
-  // Add function to load existing scores
-  const loadExistingScores = async (roundId: string) => {
-    try {
-      const { data: scores, error } = await supabase
-        .from('scores')
-        .select('*')
-        .eq('round_id', roundId);
-
-      if (error) throw error;
-
-      // Update players with existing scores
-      if (scores) {
-        setPlayers(prev => prev.map(player => {
-          const playerScores = [...player.scores];
-          scores
-            .filter(score => score.player_id === player.id)
-            .forEach(score => {
-              playerScores[score.hole_number - 1] = score.gross_score;
-            });
-          return {
-            ...player,
-            scores: playerScores,
-          };
-        }));
-      }
-    } catch (error) {
-      console.error('Error loading scores:', error);
-    }
-  };
-
-  // Add new function to check for missing scores
-  const hasMissingScores = () => {
-    return players.some((player: Player) => 
-      player.scores.some((score: number | null) => score === null)
-    );
-  };
-
-  // Modify handleFinishRound to update round status
-  const handleFinishRound = async () => {
-    if (!roundId) return;
-
-    if (hasMissingScores()) {
-      setShowMissingScoresAlert(true);
-    } else {
-      try {
-        const { error } = await supabase
-          .from('rounds')
-          .update({ status: 'completed' })
-          .eq('id', roundId);
-
-        if (error) throw error;
-        
-        setRoundEndTime(new Date());
-        setShowSummary(true);
-      } catch (error) {
-        console.error('Error completing round:', error);
-      }
-    }
-  };
-
-  // Add new function to handle missing scores alert
-  const handleMissingScoresAlert = (continueAnyway: boolean) => {
-    setShowMissingScoresAlert(false);
-    if (continueAnyway) {
-      setRoundEndTime(new Date());
-      setShowSummary(true);
-    }
-  };
-
-  // Add new function to handle finishing the round
-  const handleCompleteRound = () => {
-    // Here you would typically save the round data
-    router.push('/');
-  };
-
-  const handleGPSPress = () => {
-    router.push({
-      pathname: 'hole-view' as const,
-      params: {
-        holeNumber: currentHole.toString(),
-        courseId: params.courseId
-      }
-    });
-  };
-
-  // Add this function to create a new round
-  const createRound = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('rounds')
-        .insert({
-          course_name: courseName,
-          tee_name: teeName,
-          tee_color: teeColor,
-          rating: rating,
-          slope: slope,
-          date_played: new Date().toISOString(),
-          status: 'in_progress'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      setRoundId(data.id);
-      return data.id;
-    } catch (error) {
-      console.error('Error creating round:', error);
-      return null;
-    }
-  };
-
-  // Add useEffect to initialize round
-  useEffect(() => {
-    const initializeRound = async () => {
-      setIsLoading(true);
-      try {
-        // Check for existing round ID in params
-        const existingRoundId = params.roundId as string;
-        
-        if (existingRoundId) {
-          setRoundId(existingRoundId);
-          await loadExistingScores(existingRoundId);
-        } else {
-          const newRoundId = await createRound();
-          if (newRoundId) {
-            setRoundId(newRoundId);
-          }
-        }
-      } catch (error) {
-        console.error('Error initializing round:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeRound();
-  }, []);
-
-  // If showing summary, render the RoundSummary component
-  if (showSummary) {
-    return (
-      <RoundSummary
-        players={players}
-        holes={holes}
-        onBackToScorecard={() => setShowSummary(false)}
-        onFinishRound={handleCompleteRound}
-        endTime={roundEndTime || new Date()}
-        modifications={scoreModifications}
-      />
-    );
-  }
-
-  const renderHeader = () => (
-    <View style={styles.header}>
-      <View style={styles.headerTop}>
-        <View style={styles.courseDetails}>
-          <Text style={styles.courseName}>{courseName}</Text>
-          <Text style={styles.teeInfo}>{teeColor} Tees - {teeName}</Text>
-          <Text style={styles.ratingInfo}>Rating: {rating} | Slope: {slope}</Text>
-          {competitiveOptions && (
-            <View style={styles.competitiveOptionsContainer}>
-              <Text style={styles.competitiveOptionsText}>
-                {competitiveOptions.type === 'last-round' ? 'Competing against last round' :
-                 competitiveOptions.type === 'course-average' ? 'Competing against course average' :
-                 competitiveOptions.type === 'best-round' ? 'Competing against best round' :
-                 competitiveOptions.type === 'best-by-hole' ? 'Competing against best by hole' :
-                 competitiveOptions.type === 'course-record' ? 'Competing against course record' : ''}
-              </Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.closeButton}>
-            <Ionicons name="close" size={24} color="#000" />
-          </TouchableOpacity>
-          <View style={styles.scoreDisplay}>
-            <Text style={styles.scoreLabel}>Gross/Net</Text>
-            <Text style={styles.scoreValue}>{grossScore}/{netScore}</Text>
-          </View>
-        </View>
-      </View>
-
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.playerSelector}
-      >
-        {players.map((player: Player, index: number) => (
-          <TouchableOpacity
-            key={player.id}
-            style={[
-              styles.playerSelectorItem,
-              index === selectedPlayerIndex && styles.playerSelectorItemSelected
-            ]}
-            onPress={() => setSelectedPlayerIndex(index)}
-          >
-            {player.avatar ? (
-              <Image source={{ uri: player.avatar }} style={styles.playerSelectorAvatar} />
-            ) : (
-              <View style={styles.playerSelectorAvatarPlaceholder}>
-                <Text style={styles.playerSelectorAvatarText}>
-                  {player.name.split(' ').map((n: string) => n[0]).join('')}
-                </Text>
-              </View>
-            )}
-            <Text style={styles.playerSelectorName} numberOfLines={1}>
-              {player.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
-  );
-
-  const renderTabs = () => (
-    <View style={styles.tabs}>
-      <TouchableOpacity
-        style={[styles.tab, activeTab === 'scores' && styles.activeTab]}
-        onPress={() => setActiveTab('scores')}
-      >
-        <Text style={[styles.tabText, activeTab === 'scores' && styles.activeTabText]}>
-          Scores
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.tab, activeTab === 'stats' && styles.activeTab]}
-        onPress={() => setActiveTab('stats')}
-      >
-        <Text style={[styles.tabText, activeTab === 'stats' && styles.activeTabText]}>
-          Stats
-        </Text>
-      </TouchableOpacity>
-      {activeTab === 'scores' && (
-        <Text style={styles.tabInstructions}>Click any hole column to edit scores</Text>
-      )}
-    </View>
-  );
-
-  const renderScorecard = () => (
-    <ScrollView style={styles.scorecard}>
-      <View style={styles.scorecardContainer}>
-        {/* Fixed left column for labels */}
-        <View style={styles.leftColumn}>
-          <View style={styles.headerCell}>
-            <Text style={styles.rowHeader}>Hole</Text>
-          </View>
-          <View style={styles.headerCell}>
-            <Text style={styles.rowHeader}>Par</Text>
-          </View>
-          <View style={styles.headerCell}>
-            <Text style={styles.rowHeader}>Handicap</Text>
-          </View>
-          {players.map((player: Player, index: number) => (
-            <View key={player.id} style={styles.playerNameCell}>
-              <View style={styles.playerInfo}>
-                {player.avatar ? (
-                  <Image source={{ uri: player.avatar }} style={styles.playerAvatar} />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarText}>
-                      {player.name.split(' ').map((n: string) => n[0]).join('')}
-                    </Text>
-                  </View>
-                )}
-                <Text style={styles.playerName} numberOfLines={1}>
-                  {player.name}
-                </Text>
-              </View>
-            </View>
-          ))}
-          <TouchableOpacity 
-            style={styles.scorecardAddPlayerButton}
-            onPress={() => setShowAddPlayerModal(true)}
-          >
-            <View style={styles.playerInfo}>
-              <View style={[styles.avatarPlaceholder, { backgroundColor: '#007AFF' }]}>
-                <Ionicons name="add" size={16} color="#fff" />
-              </View>
-              <Text style={[styles.playerName, { color: '#007AFF' }]}>Add Player</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Scrollable right section for holes and scores */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.gridContainer}>
-            {/* Header Row */}
-            <View style={styles.gridRow}>
-              {holes.map((hole) => (
-                <TouchableOpacity
-                  key={hole.number}
-                  style={[
-                    styles.gridCell,
-                    styles.headerCell,
-                    hole.number === currentHole && styles.currentHoleCell
-                  ]}
-                  onPress={() => handleHolePress(hole.number)}
-                >
-                  <Text style={styles.columnHeader}>{hole.number}</Text>
-                </TouchableOpacity>
-              ))}
-              <View style={[styles.gridCell, styles.headerCell, styles.totalCell]}>
-                <Text style={styles.columnHeader}>Total</Text>
-              </View>
-            </View>
-
-            {/* Par Row */}
-            <View style={styles.gridRow}>
-              {holes.map((hole) => (
-                <View
-                  key={hole.number}
-                  style={[
-                    styles.gridCell,
-                    styles.dataCell,
-                    hole.number === currentHole && styles.currentHoleCell
-                  ]}
-                >
-                  <Text style={styles.rowData}>{hole.par}</Text>
-                </View>
-              ))}
-              <View style={[styles.gridCell, styles.dataCell, styles.totalCell]}>
-                <Text style={styles.rowData}>{holes.reduce((sum, hole) => sum + hole.par, 0)}</Text>
-              </View>
-            </View>
-
-            {/* Handicap Row */}
-            <View style={styles.gridRow}>
-              {holes.map((hole) => (
-                <View
-                  key={hole.number}
-                  style={[
-                    styles.gridCell,
-                    styles.dataCell,
-                    hole.number === currentHole && styles.currentHoleCell
-                  ]}
-                >
-                  <Text style={styles.rowData}>{hole.handicap}</Text>
-                </View>
-              ))}
-              <View style={[styles.gridCell, styles.dataCell, styles.totalCell]}>
-                <Text style={styles.rowData}>-</Text>
-              </View>
-            </View>
-
-            {/* Player Score Rows */}
-            {players.map((player: Player) => (
-              <View key={player.id} style={styles.gridRow}>
-                {holes.map((hole, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.gridCell,
-                      styles.dataCell,
-                      hole.number === currentHole && styles.currentHoleCell,
-                      player.scores[index] !== null && styles.filledScoreCell
-                    ]}
-                    onPress={() => handleHolePress(hole.number)}
-                  >
-                    <Text style={[
-                      styles.scoreCellText,
-                      player.scores[index] !== null && (
-                        player.scores[index]! > holes[index].par ? styles.overParScore :
-                        player.scores[index]! < holes[index].par ? styles.underParScore :
-                        styles.parScore
-                      )
-                    ]}>
-                      {player.scores[index] !== null ? player.scores[index] : '-'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                <View style={[styles.gridCell, styles.dataCell, styles.totalCell]}>
-                  <Text style={styles.totalScoreCellText}>
-                    {player.scores.reduce((sum: number, score: number | null) => sum + (score || 0), 0)}
-                  </Text>
-                </View>
-              </View>
-            ))}
-
-            {/* Comp Scores Row */}
-            {competitiveOptions && (
-              <View style={styles.gridRow}>
-                <View style={[styles.gridCell, styles.dataCell, styles.compScoreCell]}>
-                  <Text style={styles.compScoreLabel}>Comp Scores</Text>
-                </View>
-                {holes.map((hole, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.gridCell,
-                      styles.dataCell,
-                      styles.compScoreCell
-                    ]}
-                  >
-                    <Text style={styles.compScoreText}>
-                      {mockPlayers[0].scores[index]}
-                    </Text>
-                  </View>
-                ))}
-                <View style={[styles.gridCell, styles.dataCell, styles.totalCell, styles.compScoreCell]}>
-                  <Text style={styles.compScoreText}>
-                    {mockPlayers[0].scores.reduce((sum, score) => sum + score, 0)}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* Empty row for Add Player button alignment */}
-            <View style={styles.gridRow}>
-              {holes.map((hole, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.gridCell,
-                    styles.dataCell,
-                    hole.number === currentHole && styles.currentHoleCell,
-                    styles.emptyScoreCell
-                  ]}
-                />
-              ))}
-              <View style={[styles.gridCell, styles.dataCell, styles.totalCell]} />
-            </View>
-          </View>
-        </ScrollView>
-      </View>
-
-      <ScoreEditModal
-        visible={showScoreEditModal}
-        onClose={() => setShowScoreEditModal(false)}
-        onSave={handleSaveScores}
-        players={players}
-        currentHole={currentHole}
-        currentScores={editingScores}
-      />
-    </ScrollView>
-  );
-
-  const renderFooter = () => (
-    <View style={styles.footer}>
-      <TouchableOpacity 
-        style={styles.footerButton}
-        onPress={handleGPSPress}
-      >
-        <Text style={styles.footerButtonText}>Back to GPS</Text>
-      </TouchableOpacity>
-      <TouchableOpacity 
-        style={[styles.footerButton, styles.finishButton]}
-        onPress={handleFinishRound}
-      >
-        <Text style={styles.footerButtonText}>Finish Round</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.moreButton}>
-        <Ionicons name="ellipsis-horizontal" size={24} color="#000" />
-      </TouchableOpacity>
-
-      {/* Add Missing Scores Alert */}
-      <Modal
-        visible={showMissingScoresAlert}
-        transparent
-        animationType="fade"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.alertContent}>
-            <Text style={styles.alertTitle}>Missing Scores</Text>
-            <Text style={styles.alertText}>
-              Some scores are missing. Would you like to continue anyway?
-            </Text>
-            <View style={styles.alertButtons}>
-              <TouchableOpacity 
-                style={[styles.alertButton, styles.alertButtonCancel]}
-                onPress={() => handleMissingScoresAlert(false)}
-              >
-                <Text style={styles.alertButtonText}>Return to Scorecard</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.alertButton, styles.alertButtonConfirm]}
-                onPress={() => handleMissingScoresAlert(true)}
-              >
-                <Text style={styles.alertButtonConfirmText}>End Round</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
-
-  // Add loading state to render
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text>Loading scorecard...</Text>
-      </View>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="black" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Scorecard</Text>
-      </View>
-      {renderHeader()}
-      {renderTabs()}
-      {activeTab === 'scores' ? renderScorecard() : null}
-      {renderFooter()}
-
-      <AddPlayerModal
-        visible={showAddPlayerModal}
-        onClose={() => setShowAddPlayerModal(false)}
-        onAddPlayers={handleAddPlayers}
-        currentSettings={JSON.stringify({
-          courseName,
-          teeName,
-          teeColor,
-          rating,
-          slope,
-          holes,
-        })}
-      />
-    </SafeAreaView>
-  );
+interface HoleScores {
+  [key: `hole_${number}_score`]: number | null;
 }
 
 const styles = StyleSheet.create({
@@ -969,79 +54,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
   },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  courseDetails: {
-    flex: 1,
-    marginRight: 16,
-  },
-  headerRight: {
-    alignItems: 'flex-end',
-  },
-  courseName: {
+  headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    marginBottom: 4,
-  },
-  closeButton: {
-    padding: 4,
-    marginBottom: 8,
-  },
-  teeInfo: {
-    fontSize: 16,
-    color: '#667',
-    marginBottom: 2,
-  },
-  ratingInfo: {
-    fontSize: 16,
-    color: '#667',
-    marginBottom: 4,
-  },
-  scoreDisplay: {
-    backgroundColor: '#F5F5F5',
-    padding: 8,
-    borderRadius: 8,
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  scoreLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  scoreValue: {
-    fontSize: 24,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  tabs: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#007AFF',
-  },
-  tabText: {
-    fontSize: 16,
-    color: '#667',
-  },
-  activeTabText: {
-    color: '#007AFF',
-    fontWeight: '600',
+    marginLeft: 16,
   },
   scorecard: {
     flex: 1,
@@ -1050,26 +78,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   leftColumn: {
-    width: 150,
+    width: 100,
     backgroundColor: '#fff',
     borderRightWidth: 1,
     borderRightColor: '#E5E5E5',
-  },
-  gridContainer: {
-    backgroundColor: '#fff',
-  },
-  gridRow: {
-    flexDirection: 'row',
-    height: 40,
-  },
-  gridCell: {
-    width: 50,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#E5E5E5',
   },
   headerCell: {
     backgroundColor: '#F5F5F5',
@@ -1077,351 +89,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
+    padding: 8,
   },
-  dataCell: {
-    backgroundColor: '#fff',
-  },
-  totalCell: {
-    width: 70,
-    backgroundColor: '#F5F5F5',
+  rowHeader: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
   },
   playerNameCell: {
     height: 40,
     justifyContent: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
-    paddingHorizontal: 8,
-  },
-  playerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  playerAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    marginRight: 8,
-  },
-  avatarPlaceholder: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  avatarText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    padding: 8,
   },
   playerName: {
     fontSize: 14,
-    flex: 1,
+  },
+  gridContainer: {
+    backgroundColor: '#fff',
+  },
+  gridRow: {
+    flexDirection: 'row',
+  },
+  dataCell: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+    borderRightWidth: 1,
+    borderRightColor: '#E5E5E5',
   },
   columnHeader: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
-  },
-  rowHeader: {
-    fontSize: 14,
-    fontWeight: '600',
     color: '#666',
-    paddingLeft: 8,
   },
   rowData: {
-    fontSize: 14,
-    color: '#333',
-  },
-  scoreCellText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  totalScoreCellText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  currentHoleCell: {
-    backgroundColor: '#E3F2FD',
-  },
-  filledScoreCell: {
-    backgroundColor: '#FAFAFA',
-  },
-  overParScore: {
-    color: '#FF3B30',
-  },
-  underParScore: {
-    color: '#34C759',
-  },
-  parScore: {
-    color: '#333',
-  },
-  addPlayerButton: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-    marginRight: 16,
-    height: '100%',
-  },
-  addPlayerText: {
-    fontSize: 12,
-    color: '#007AFF',
-    marginTop: 4,
-  },
-  footer: {
-    flexDirection: 'row',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
-  },
-  footerButton: {
-    flex: 1,
-    backgroundColor: '#007AFF',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  finishButton: {
-    marginRight: 8,
-  },
-  footerButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  moreButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-  },
-  tabInstructions: {
-    position: 'absolute',
-    bottom: 4,
-    left: 16,
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  playerSelector: {
-    marginTop: 12,
-  },
-  playerSelectorItem: {
-    alignItems: 'center',
-    marginRight: 16,
-    padding: 8,
-    borderRadius: 8,
-  },
-  playerSelectorItemSelected: {
-    backgroundColor: '#E3F2FD',
-  },
-  playerSelectorAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginBottom: 4,
-  },
-  playerSelectorAvatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  playerSelectorAvatarText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  playerSelectorName: {
-    fontSize: 12,
-    color: '#333',
-    textAlign: 'center',
-  },
-  alertContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    width: '80%',
-    alignItems: 'center',
-  },
-  alertTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  alertText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-    color: '#666',
-  },
-  alertButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  alertButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    marginHorizontal: 8,
-  },
-  alertButtonCancel: {
-    backgroundColor: '#F5F5F5',
-  },
-  alertButtonConfirm: {
-    backgroundColor: '#007AFF',
-  },
-  alertButtonText: {
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  alertButtonConfirmText: {
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  summaryContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  summaryHeader: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-  },
-  summaryTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  summaryNavigation: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  navButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#F5F5F5',
-  },
-  navButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
-    marginHorizontal: 8,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  summaryScroll: {
-    flex: 1,
-    padding: 16,
-  },
-  summaryPlayerCard: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-  },
-  summaryPlayerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  summaryPlayerInfo: {
-    marginLeft: 12,
-  },
-  summaryPlayerName: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  summaryPlayerHandicap: {
-    fontSize: 14,
-    color: '#666',
-  },
-  summaryScores: {
-    alignItems: 'flex-end',
-  },
-  summaryScore: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  overPar: {
-    color: '#FF3B30',
-  },
-  underPar: {
-    color: '#34C759',
-  },
-  summaryEndTime: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
-  },
-  modificationsSection: {
-    marginTop: 24,
-    padding: 16,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-  },
-  modificationsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  modificationItem: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-  },
-  modificationText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  modificationTime: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  competitiveOptionsContainer: {
-    backgroundColor: '#f0f0f0',
-    padding: 8,
-    borderRadius: 4,
-    marginTop: 4,
-  },
-  competitiveOptionsText: {
     fontSize: 14,
     color: '#666',
   },
@@ -1432,111 +138,347 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: 'white',
     padding: 20,
-    width: '90%',
-    maxHeight: '80%',
+    borderRadius: 10,
+    width: '80%',
   },
-  modalHeader: {
+  scoreButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 10,
+  },
+  scoreButton: {
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 25,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+  },
+  scoreButtonText: {
+    fontSize: 18,
+    color: '#333',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
-  },
-  scoreInputRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-  },
-  modalAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  modalAvatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalAvatarText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalPlayerName: {
-    fontSize: 16,
-    marginLeft: 12,
-  },
-  scoreInput: {
-    width: 60,
-    height: 40,
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-    borderRadius: 8,
+    marginBottom: 15,
     textAlign: 'center',
-    fontSize: 16,
   },
-  saveButton: {
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  scorecardAddPlayerButton: {
-    height: 40,
-    justifyContent: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-    paddingHorizontal: 8,
-    backgroundColor: '#F5F5F5',
-  },
-  emptyScoreCell: {
-    backgroundColor: '#F5F5F5',
-  },
-  compScoreCell: {
-    backgroundColor: '#E8F5E9',
-    borderTopWidth: 2,
-    borderTopColor: '#4CAF50',
-    borderBottomWidth: 2,
-    borderBottomColor: '#4CAF50',
-  },
-  compScoreLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2E7D32',
-    textAlign: 'left',
-    paddingLeft: 8,
-  },
-  compScoreText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2E7D32',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginLeft: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-}); 
+});
+
+export default function Scorecard({ 
+  courseName = "Charlie Yates", 
+  teeName = "Black",
+  roundId: initialRoundId 
+}: Props) {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [holes, setHoles] = useState<{ number: number; par: number }[]>([]);
+  const [roundId, setRoundId] = useState<string | null>(initialRoundId || null);
+  const [selectedCell, setSelectedCell] = useState<{
+    playerId: string;
+    holeNumber: number;
+  } | null>(null);
+  const [showScoreModal, setShowScoreModal] = useState(false);
+
+  // Fetch holes data from Supabase
+  const fetchHoles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('charlie_yates_holes')
+        .select('*')
+        .order('number');
+      
+      if (error) throw error;
+      setHoles(data || []);
+    } catch (error) {
+      console.error('Error fetching holes:', error);
+    }
+  };
+
+  // Fetch available players from Supabase profiles
+  const fetchPlayers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username');
+      
+      if (error) throw error;
+      
+      const playersWithScores = (data || []).map(player => ({
+        id: player.id,
+        username: player.username,
+        scores: Array(18).fill(null)
+      }));
+      
+      setPlayers(playersWithScores);
+    } catch (error) {
+      console.error('Error fetching players:', error);
+    }
+  };
+
+  // Load existing scores when round is created
+  const loadExistingScores = async (roundId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('charlie_yates_scorecards')
+        .select('*')
+        .eq('id', roundId);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setPlayers(prev => prev.map(player => {
+          if (player.id === data[0].user_id) {
+            // Create scores array from individual hole columns
+            const scores = Array(18).fill(null).map((_, index) => {
+              const holeScore = data[0][`hole_${index + 1}_score`];
+              return holeScore !== undefined ? holeScore : null;
+            });
+            return { ...player, scores };
+          }
+          return player;
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading scores:', error);
+    }
+  };
+
+  // Initialize the scorecard
+  useEffect(() => {
+    const initialize = async () => {
+      try {
+        await Promise.all([fetchHoles(), fetchPlayers()]);
+        if (roundId) {
+          await loadExistingScores(roundId);
+        }
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initialize();
+  }, [roundId]);
+
+  // Update the saveScore function to be more explicit
+  const saveScore = async (playerId: string, holeNumber: number, score: number) => {
+    if (!roundId) {
+      console.error('No roundId available');
+      return;
+    }
+
+    console.log('Saving score:', { playerId, holeNumber, score, roundId });
+
+    try {
+      // First update local state for immediate UI feedback
+      setPlayers(prevPlayers => {
+        return prevPlayers.map(player => {
+          if (player.id === playerId) {
+            const newScores = [...player.scores];
+            newScores[holeNumber - 1] = score;
+            return { ...player, scores: newScores };
+          }
+          return player;
+        });
+      });
+
+      // Create the column name based on the hole number
+      const scoreColumn = `hole_${holeNumber}_score`;
+      
+      // Update the specific hole's score in the scorecard
+      const { data, error } = await supabase
+        .from('charlie_yates_scorecards')
+        .update({
+          [scoreColumn]: score,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', roundId)
+        .eq('user_id', playerId)
+        .select();
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      console.log('Successfully saved score to Supabase:', data);
+
+    } catch (error) {
+      console.error('Error saving score:', error);
+      // Revert the local state if the save failed
+      loadExistingScores(roundId);
+      alert('Failed to save score. Please try again.');
+    }
+  };
+
+  // Update the handleScoreSelect function
+  const handleScoreSelect = async (score: number) => {
+    if (!selectedCell) {
+      console.error('No cell selected');
+      return;
+    }
+
+    console.log('Score selected:', {
+      playerId: selectedCell.playerId,
+      holeNumber: selectedCell.holeNumber,
+      score
+    });
+
+    try {
+      // Prevent modal from closing before save completes
+      await saveScore(selectedCell.playerId, selectedCell.holeNumber, score);
+      console.log('Score saved successfully');
+      setShowScoreModal(false);
+      setSelectedCell(null);
+    } catch (error) {
+      console.error('Failed to save score:', error);
+      alert('Failed to save score. Please try again.');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading scorecard...</Text>
+      </View>
+    );
+  }
+
+  const scoreModal = (
+    <Modal
+      visible={showScoreModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        setShowScoreModal(false);
+        setSelectedCell(null);
+      }}
+    >
+      <TouchableOpacity 
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={() => {
+          setShowScoreModal(false);
+          setSelectedCell(null);
+        }}
+      >
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>
+            {selectedCell ? `Enter score for Hole ${selectedCell.holeNumber}` : 'Select Score'}
+          </Text>
+          <View style={styles.scoreButtons}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
+              <TouchableOpacity
+                key={score}
+                style={styles.scoreButton}
+                onPress={() => {
+                  console.log('Score button pressed:', score);
+                  handleScoreSelect(score);
+                }}
+              >
+                <Text style={styles.scoreButtonText}>{score}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="black" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{courseName}</Text>
+      </View>
+
+      {/* Scorecard Grid */}
+      <ScrollView style={styles.scorecard}>
+        <View style={styles.scorecardContainer}>
+          {/* Left Column */}
+          <View style={styles.leftColumn}>
+            <View style={styles.headerCell}>
+              <Text style={styles.rowHeader}>Hole</Text>
+            </View>
+            <View style={styles.headerCell}>
+              <Text style={styles.rowHeader}>Par</Text>
+            </View>
+            {players.map((player) => (
+              <View key={player.id} style={styles.playerNameCell}>
+                <Text style={styles.playerName}>{player.username}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Scrollable Scores Section */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.gridContainer}>
+              {/* Header Row - Hole Numbers */}
+              <View style={styles.gridRow}>
+                {holes.map((hole) => (
+                  <View key={hole.number} style={styles.headerCell}>
+                    <Text style={styles.columnHeader}>{hole.number}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Par Row */}
+              <View style={styles.gridRow}>
+                {holes.map((hole) => (
+                  <View key={hole.number} style={styles.dataCell}>
+                    <Text style={styles.rowData}>{hole.par}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Player Scores */}
+              {players.map((player) => (
+                <View key={player.id} style={styles.gridRow}>
+                  {holes.map((hole) => (
+                    <TouchableOpacity
+                      key={hole.number}
+                      style={styles.dataCell}
+                      onPress={() => {
+                        console.log('Cell pressed:', {
+                          playerId: player.id,
+                          holeNumber: hole.number,
+                          currentScore: player.scores[hole.number - 1]
+                        });
+                        setSelectedCell({
+                          playerId: player.id,
+                          holeNumber: hole.number
+                        });
+                        setShowScoreModal(true);
+                      }}
+                    >
+                      <Text style={styles.rowData}>
+                        {player.scores[hole.number - 1] === null ? '-' : player.scores[hole.number - 1]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      </ScrollView>
+      {scoreModal}
+    </SafeAreaView>
+  );
+}

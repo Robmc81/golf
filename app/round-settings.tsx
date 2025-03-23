@@ -8,6 +8,7 @@ import { colors } from './constants/colors';
 import { TeeSelectionModal } from './tee-selection-modal';
 import { VisibilitySelectionModal } from './visibility-selection-modal';
 import { GameTypeSelectionModal } from './game-type-selection-modal';
+import { supabase } from './lib/supabase';
 
 interface Player {
   id: string;
@@ -93,25 +94,100 @@ export default function RoundSettingsScreen() {
     return gameTypes[selectedGameType] || 'Select Game Type';
   };
 
-  const handleStartRound = () => {
+  const handleStartRound = async () => {
     if (!selectedCourse) return;
 
-    const settings: RoundSettings = {
-      courseId: selectedCourse._id,
-      courseName: selectedCourse.name,
-      courseSlug: selectedCourse.slug,
-      startingHole,
-      selectedTee,
-      visibility: selectedVisibility,
-      selectedGroupIds,
-      gameType: selectedGameType,
-      roundType,
-    };
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('No user found');
+
+      // Create the round with the correct structure
+      const { data: roundData, error } = await supabase
+        .from('charlie_yates_scorecards')
+        .insert({
+          user_id: session.user.id,
+          date_played: new Date().toISOString(),
+          tee_box: selectedTee?.color || 'Black',
+          weather_conditions: null,
+          playing_partners: [],
+          tournament_round: false,
+          // Initialize all hole data
+          hole_1_score: null,
+          hole_1_putts: null,
+          hole_1_fairway: null,
+          hole_1_gir: null,
+          hole_1_notes: null,
+          hole_2_score: null,
+          hole_2_putts: null,
+          hole_2_fairway: null,
+          hole_2_gir: null,
+          hole_2_notes: null,
+          hole_3_score: null,
+          hole_3_putts: null,
+          hole_3_fairway: null,
+          hole_3_gir: null,
+          hole_3_notes: null,
+          hole_4_score: null,
+          hole_4_putts: null,
+          hole_4_fairway: null,
+          hole_4_gir: null,
+          hole_4_notes: null,
+          hole_5_score: null,
+          hole_5_putts: null,
+          hole_5_fairway: null,
+          hole_5_gir: null,
+          hole_5_notes: null,
+          hole_6_score: null,
+          hole_6_putts: null,
+          hole_6_fairway: null,
+          hole_6_gir: null,
+          hole_6_notes: null,
+          hole_7_score: null,
+          hole_7_putts: null,
+          hole_7_fairway: null,
+          hole_7_gir: null,
+          hole_7_notes: null,
+          hole_8_score: null,
+          hole_8_putts: null,
+          hole_8_fairway: null,
+          hole_8_gir: null,
+          hole_8_notes: null,
+          hole_9_score: null,
+          hole_9_putts: null,
+          hole_9_fairway: null,
+          hole_9_gir: null,
+          hole_9_notes: null,
+          total_score: 0,
+          total_putts: 0,
+          fairways_hit: 0,
+          greens_hit: 0,
+          status: 'in_progress',
+          total_fairways: 0,
+          total_gir: 0
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Supabase insert error:', error);
+        throw error;
+      }
 
     router.push({
-      pathname: '/add-players' as any,
-      params: { settings: JSON.stringify(settings) },
+      pathname: '/hole-view',
+      params: {
+        roundId: roundData.id,
+        courseName: params.courseName,
+        teeName: selectedTee?.color || 'Black',
+        courseId: selectedCourse._id,
+        holeNumber: startingHole.toString()
+      }
     });
+
+    } catch (error) {
+      console.error('Error creating round:', error);
+      alert('Failed to create round. Please try again.');
+    }
   };
 
   const handleTeeSelect = (gender: 'men' | 'women', color: string) => {
