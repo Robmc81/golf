@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import MapView, { Marker, Camera } from 'react-native-maps';
 import { HOLE_COORDINATES } from './config/maps';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from './utils/supabaseClient';
+import { useSessionContext } from './contexts/SessionContext';
 
 interface HoleViewParams { 
   holeNumber?: string;  
@@ -48,7 +50,8 @@ interface ScoreEntry {
 
 interface Player {
   id: string;
-  name: string;
+  username: string;
+  scores: (number | null)[];
 }
 
 const saveScoresToBackend = async ({
@@ -81,14 +84,13 @@ export default function HoleViewScreen() {
   const [showWindSlope, setShowWindSlope] = useState(false);
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [players] = useState<Player[]>([
-    { id: '1', name: 'Player 1' },
-    { id: '2', name: 'Player 2' },
-    { id: '3', name: 'Player 3' },
-    { id: '4', name: 'Player 4' },
+    { id: '1', username: 'Player 1', scores: [] },
+    { id: '2', username: 'Player 2', scores: [] },
+    { id: '3', username: 'Player 3', scores: [] },
+    { id: '4', username: 'Player 4', scores: [] },
   ]);
   
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>(players[0].id);
-  const [scores, setScores] = useState<Record<string, ScoreEntry>>({});
   const [showNextHolePrompt, setShowNextHolePrompt] = useState(false);
 
   // Update the state type to make altitude optional
@@ -100,6 +102,13 @@ export default function HoleViewScreen() {
     heading: holeCoordinates.heading,
     altitude: null,  // or undefined
   });
+
+  const [session] = useSessionContext();
+  const [selectedCell, setSelectedCell] = useState<{
+    playerId: string;
+    holeNumber: number;
+  } | null>(null);
+  const [roundId, setRoundId] = useState<string | null>(null);
 
   /** Initialize map view when ready **/
   const handleMapReady = () => {
@@ -167,22 +176,61 @@ export default function HoleViewScreen() {
 
   /** Handle score entry **/
   const handleScoreEntry = () => {
+    console.log('handleScoreEntry called');
+    console.log('Current session:', session?.user);
+    console.log('Current roundId:', roundId);
+
+    if (!session?.user) {
+      console.error('No user session in handleScoreEntry');
+      alert('Please log in to enter scores');
+      return;
+    }
+
+    if (!roundId) {
+      console.error('No active round found in handleScoreEntry');
+      alert('No active round found. Please start a round first.');
+      return;
+    }
+    
+    setSelectedCell({
+      playerId: session.user.id,
+      holeNumber: holeNumber
+    });
     setShowScoreModal(true);
-    // Initialize score entry for selected player if not exists
-    if (!scores[selectedPlayerId]) {
-      setScores(prev => ({
-        ...prev,
-        [selectedPlayerId]: {
-          playerId: selectedPlayerId,
-          playerName: players.find(p => p.id === selectedPlayerId)?.name || '',
-          score: null,
-          putts: null,
-          greenInRegulation: null,
-          chipShots: null,
-          greensideSand: null,
-          penalties: null
-        }
-      }));
+  };
+
+  const handleScoreSelect = async (score: number) => {
+    if (!selectedCell) {
+      console.error('No cell selected');
+      return;
+    }
+
+    if (!session?.user) {
+      console.error('No user session');
+      return;
+    }
+
+    if (!roundId) {
+      console.error('No round ID available');
+      return;
+    }
+
+    console.log('Score selected:', {
+      playerId: selectedCell.playerId,
+      holeNumber: selectedCell.holeNumber,
+      score,
+      roundId
+    });
+
+    try {
+      await saveScore(session.user.id, selectedCell.holeNumber, score);
+      console.log('Score saved successfully');
+      setShowScoreModal(false);
+      setSelectedCell(null);
+      setShowNextHolePrompt(true);
+    } catch (error) {
+      console.error('Failed to save score:', error);
+      alert('Failed to save score. Please try again.');
     }
   };
 
@@ -191,7 +239,16 @@ export default function HoleViewScreen() {
       // TODO: Implement API call to save scores
       await saveScoresToBackend({
         holeNumber,
-        scores: Object.values(scores),
+        scores: players.map(player => ({
+          playerId: player.id,
+          playerName: player.username,
+          score: player.scores[holeNumber - 1],
+          putts: null,
+          greenInRegulation: null,
+          chipShots: null,
+          greensideSand: null,
+          penalties: null
+        })),
         courseId: params.courseId
       });
       
@@ -246,6 +303,153 @@ export default function HoleViewScreen() {
   const handleWindSlope = () => {
     setShowWindSlope(!showWindSlope);
   };
+
+  // Add this function to save scores to Supabase
+  const saveScore = async (playerId: string, holeNumber: number, score: number) => {
+    console.log('saveScore called with:', { playerId, holeNumber, score });
+    console.log('Current roundId:', roundId);
+
+    try {
+      if (!session?.user) {
+        console.error('No user session in saveScore');
+        return;
+      }
+
+      if (!roundId) {
+        console.error('No active round ID available in saveScore');
+        return;
+      }
+
+      // Verify the playerId matches the session user
+      if (playerId !== session.user.id) {
+        console.error('Player ID does not match session user');
+        return;
+      }
+
+      const scoreColumn = `hole_${holeNumber}_score`;
+      console.log('Updating score column:', scoreColumn);
+      
+      const { data, error } = await supabase
+        .from('charlie_yates_scorecards')
+        .update({
+          [scoreColumn]: score,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', roundId)
+        .eq('user_id', playerId)
+        .select();
+
+      console.log('Supabase update response:', { data, error });
+
+      if (error) {
+        console.error('Supabase error in saveScore:', error);
+        throw error;
+      }
+
+      console.log('Successfully saved score to Supabase:', data);
+      return data;
+
+    } catch (error) {
+      console.error('Error in saveScore:', error);
+      alert('Failed to save score. Please try again.');
+      throw error;
+    }
+  };
+
+  // Update the loadActiveRound function with more detailed logging
+  const loadActiveRound = async () => {
+    try {
+      console.log('Starting loadActiveRound...');
+      
+      if (!session?.user) {
+        console.error('No user session found in loadActiveRound');
+        return;
+      }
+
+      const userId = session.user.id;
+      console.log('Attempting to load active round for user:', userId);
+
+      const { data, error } = await supabase
+        .from('charlie_yates_scorecards')
+        .select('*') // Change to select all fields for better debugging
+        .eq('user_id', userId)
+        .eq('active', 'true') // Change to explicitly check for 'true'
+        .single();
+
+      console.log('Supabase query response:', { data, error });
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log('No active round found for user');
+          return;
+        }
+        console.error('Supabase error in loadActiveRound:', error);
+        return;
+      }
+
+      if (data) {
+        console.log('Found active round with ID:', data.id);
+        setRoundId(data.id);
+      } else {
+        console.log('No data returned from Supabase');
+      }
+    } catch (error) {
+      console.error('Unexpected error in loadActiveRound:', error);
+    }
+  };
+
+  // Update the useEffect to include proper dependencies and logging
+  useEffect(() => {
+    console.log('useEffect triggered for loadActiveRound');
+    console.log('Current session:', session);
+    console.log('Current roundId:', roundId);
+    
+    if (session?.user && !roundId) {
+      loadActiveRound();
+    }
+  }, [session, roundId]); // Add roundId as dependency
+
+  // Add the scoreModal component
+  const scoreModal = (
+    <Modal
+      visible={showScoreModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        setShowScoreModal(false);
+        setSelectedCell(null);
+      }}
+    >
+      <TouchableOpacity 
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={() => {
+          setShowScoreModal(false);
+          setSelectedCell(null);
+        }}
+      >
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>
+            {selectedCell ? `Enter score for Hole ${selectedCell.holeNumber}` : 'Select Score'}
+          </Text>
+          <View style={styles.scoreButtons}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
+              <TouchableOpacity
+                key={score}
+                style={styles.scoreButton}
+                onPress={() => {
+                  console.log('Score button pressed:', score);
+                  handleScoreSelect(score);
+                }}
+              >
+                <Text style={styles.scoreButtonText}>{score}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
 
   return (
     <View style={styles.container}>
@@ -353,177 +557,10 @@ export default function HoleViewScreen() {
         )}
       </View>
 
-      {/* Score Entry Modal */}
-      <Modal
-        visible={showScoreModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowScoreModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Enter Score</Text>
-              <TouchableOpacity onPress={() => setShowScoreModal(false)}>
-                <Ionicons name="close" size={24} color="black" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalScroll}>
-              <View style={styles.scoreInputs}>
-                <Text style={styles.inputLabel}>Score</Text>
-                <View style={styles.inputRow}>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.score === 1 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], score: 1 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>1</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.score === 2 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], score: 2 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>2</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.score === 3 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], score: 3 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>3</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.score === 4 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], score: 4 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>4</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.score === 5 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], score: 5 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>5</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.score === 6 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], score: 6 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>6</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.inputLabel}>Putts</Text>
-                <View style={styles.inputRow}>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.putts === 0 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], putts: 0 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>0</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.putts === 1 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], putts: 1 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>1</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.putts === 2 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], putts: 2 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>2</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.putts === 3 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], putts: 3 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>3</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.inputLabel}>Green in Regulation</Text>
-                <View style={styles.inputRow}>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.greenInRegulation === true && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], greenInRegulation: true } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>Yes</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.greenInRegulation === false && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], greenInRegulation: false } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>No</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.inputLabel}>Chip Shots</Text>
-                <View style={styles.inputRow}>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.chipShots === 0 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], chipShots: 0 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>0</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.chipShots === 1 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], chipShots: 1 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>1</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.chipShots === 2 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], chipShots: 2 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>2</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.inputLabel}>Greenside Sand</Text>
-                <View style={styles.inputRow}>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.greensideSand === 0 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], greensideSand: 0 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>0</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.greensideSand === 1 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], greensideSand: 1 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>1</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.greensideSand === 2 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], greensideSand: 2 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>2</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.inputLabel}>Penalties</Text>
-                <View style={styles.inputRow}>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.penalties === 0 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], penalties: 0 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>0</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.penalties === 1 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], penalties: 1 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>1</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.scoreButton, scores[selectedPlayerId]?.penalties === 2 && styles.scoreButtonActive]}
-                    onPress={() => setScores(prev => ({ ...prev, [selectedPlayerId]: { ...prev[selectedPlayerId], penalties: 2 } }))}
-                  >
-                    <Text style={styles.scoreButtonText}>2</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </ScrollView>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSaveScore}>
-              <Text style={styles.saveButtonText}>Save Score</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Next Hole Prompt Modal */}
+      {/* Replace the existing modals with just these two */}
+      {scoreModal}
+      
+      {/* Keep the Next Hole Prompt Modal */}
       <Modal
         visible={showNextHolePrompt}
         transparent
@@ -776,14 +813,14 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContent: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    height: '50%',
     padding: 20,
+    borderRadius: 10,
+    width: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -792,8 +829,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 15,
+    textAlign: 'center',
   },
   modalScroll: {
     flex: 1,
@@ -808,19 +847,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   scoreButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
+    width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 25,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
   },
   scoreButtonActive: {
     backgroundColor: '#007AFF',
   },
   scoreButtonText: {
-    fontSize: 15,
-    color: '#000',
+    fontSize: 18,
+    color: '#333',
   },
   inputLabel: {
     fontSize: 15,
@@ -895,6 +939,13 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 15,
     fontWeight: '600',
+  },
+  scoreButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 10,
   },
 });
 
