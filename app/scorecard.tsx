@@ -235,6 +235,48 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
+  scorecardWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  scrollableContent: {
+    flex: 1,
+    marginRight: 50,
+  },
+  totalsColumn: {
+    width: 50,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: '#fff',
+    borderLeftWidth: 1,
+    borderLeftColor: '#E5E5E5',
+    zIndex: 2,
+  },
+  totalCell: {
+    width: 50,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+    backgroundColor: '#F5F5F5',
+  },
+  totalCellData: {
+    width: 50,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+    backgroundColor: '#fff',
+  },
+  totalText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
 });
 
 export default function Scorecard({ 
@@ -496,6 +538,11 @@ export default function Scorecard({
     }
   };
 
+  // Add a helper function to calculate total score
+  const calculateTotal = (scores: (number | null)[]): number => {
+    return scores.reduce((sum, score) => sum + (score || 0), 0);
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -573,52 +620,82 @@ export default function Scorecard({
             ))}
           </View>
 
-          {/* Scrollable Scores Section */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.gridContainer}>
-              {/* Header Row - Hole Numbers */}
-              <View style={styles.gridRow}>
-                {holes.map((hole) => (
-                  <View key={hole.number} style={styles.gridCell}>
-                    <Text style={styles.columnHeader}>{hole.number}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Par Row */}
-              <View style={styles.gridRow}>
-                {holes.map((hole) => (
-                  <View key={hole.number} style={styles.gridCellData}>
-                    <Text style={styles.rowData}>{hole.par}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Player Scores */}
-              {players.map((player) => (
-                <View key={player.id} style={styles.gridRow}>
+          <View style={styles.scorecardWrapper}>
+            {/* Scrollable Content */}
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.scrollableContent}
+            >
+              <View style={styles.gridContainer}>
+                {/* Header Row - Hole Numbers */}
+                <View style={styles.gridRow}>
                   {holes.map((hole) => (
-                    <TouchableOpacity
-                      key={hole.number}
-                      style={styles.gridCellData}
-                      onPress={() => {
-                        addDebugLog(`Cell pressed - Hole ${hole.number}, Player ${player.username}`);
-                        setSelectedCell({
-                          playerId: player.id,
-                          holeNumber: hole.number
-                        });
-                        setShowScoreModal(true);
-                      }}
-                    >
-                      <Text style={styles.rowData}>
-                        {player.scores[hole.number - 1] === null ? '-' : player.scores[hole.number - 1]}
-                      </Text>
-                    </TouchableOpacity>
+                    <View key={hole.number} style={styles.gridCell}>
+                      <Text style={styles.columnHeader}>{hole.number}</Text>
+                    </View>
                   ))}
+                </View>
+
+                {/* Par Row */}
+                <View style={styles.gridRow}>
+                  {holes.map((hole) => (
+                    <View key={hole.number} style={styles.gridCellData}>
+                      <Text style={styles.rowData}>{hole.par}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Player Scores */}
+                {players.map((player) => (
+                  <View key={player.id} style={styles.gridRow}>
+                    {holes.map((hole) => (
+                      <TouchableOpacity
+                        key={hole.number}
+                        style={styles.gridCellData}
+                        onPress={() => {
+                          addDebugLog(`Cell pressed - Hole ${hole.number}, Player ${player.username}`);
+                          setSelectedCell({
+                            playerId: player.id,
+                            holeNumber: hole.number
+                          });
+                          setShowScoreModal(true);
+                        }}
+                      >
+                        <Text style={styles.rowData}>
+                          {player.scores[hole.number - 1] === null ? '-' : player.scores[hole.number - 1]}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+
+            {/* Fixed Totals Column */}
+            <View style={styles.totalsColumn}>
+              {/* Header Cell */}
+              <View style={styles.totalCell}>
+                <Text style={styles.totalText}>Total</Text>
+              </View>
+
+              {/* Par Total */}
+              <View style={styles.totalCellData}>
+                <Text style={styles.totalText}>
+                  {holes.reduce((sum, hole) => sum + hole.par, 0)}
+                </Text>
+              </View>
+
+              {/* Player Score Totals */}
+              {players.map((player) => (
+                <View key={player.id} style={styles.totalCellData}>
+                  <Text style={styles.totalText}>
+                    {calculateTotal(player.scores)}
+                  </Text>
                 </View>
               ))}
             </View>
-          </ScrollView>
+          </View>
         </View>
       </ScrollView>
       {scoreModal}
