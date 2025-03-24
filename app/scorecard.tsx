@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
   gridRow: {
     flexDirection: 'row',
   },
-  dataCell: {
+  gridCell: {
     width: 40,
     height: 40,
     justifyContent: 'center',
@@ -123,6 +123,18 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E5E5',
     borderRightWidth: 1,
     borderRightColor: '#E5E5E5',
+    backgroundColor: '#F5F5F5',  // Light gray background for header cells
+  },
+  gridCellData: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+    borderRightWidth: 1,
+    borderRightColor: '#E5E5E5',
+    backgroundColor: '#fff',  // White background for data cells
   },
   columnHeader: {
     fontSize: 14,
@@ -334,29 +346,39 @@ export default function Scorecard({
   // Modify loadExistingScores to properly map the hole scores
   const loadExistingScores = async (roundId: string) => {
     try {
+      addDebugLog(`Loading scores for round ID: ${roundId}`);
       const { data, error } = await supabase
         .from('charlie_yates_scorecards')
         .select('*')
         .eq('id', roundId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        addDebugLog(`Error loading scores: ${error.message}`);
+        throw error;
+      }
 
       if (data) {
+        addDebugLog('Found scorecard data, mapping scores...');
         // Update players with the correct scores
         setPlayers(prev => prev.map(player => {
           if (player.id === data.user_id) {
-            // Map all 9 holes' scores
+            // Map all 9 holes' scores, ensuring correct alignment
             const scores = Array(9).fill(null).map((_, index) => {
               const holeNumber = index + 1;
-              return data[`hole_${holeNumber}_score`] || null;
+              const score = data[`hole_${holeNumber}_score`];
+              addDebugLog(`Hole ${holeNumber}: Score = ${score}`);
+              return score || null;
             });
             return { ...player, scores };
           }
           return player;
         }));
+      } else {
+        addDebugLog('No scorecard data found');
       }
     } catch (error) {
+      addDebugLog(`Error in loadExistingScores: ${error}`);
       console.error('Error loading scores:', error);
     }
   };
@@ -557,7 +579,7 @@ export default function Scorecard({
               {/* Header Row - Hole Numbers */}
               <View style={styles.gridRow}>
                 {holes.map((hole) => (
-                  <View key={hole.number} style={styles.headerCell}>
+                  <View key={hole.number} style={styles.gridCell}>
                     <Text style={styles.columnHeader}>{hole.number}</Text>
                   </View>
                 ))}
@@ -566,7 +588,7 @@ export default function Scorecard({
               {/* Par Row */}
               <View style={styles.gridRow}>
                 {holes.map((hole) => (
-                  <View key={hole.number} style={styles.dataCell}>
+                  <View key={hole.number} style={styles.gridCellData}>
                     <Text style={styles.rowData}>{hole.par}</Text>
                   </View>
                 ))}
@@ -578,13 +600,9 @@ export default function Scorecard({
                   {holes.map((hole) => (
                     <TouchableOpacity
                       key={hole.number}
-                      style={styles.dataCell}
+                      style={styles.gridCellData}
                       onPress={() => {
-                        console.log('Cell pressed:', {
-                          playerId: player.id,
-                          holeNumber: hole.number,
-                          currentScore: player.scores[hole.number - 1]
-                        });
+                        addDebugLog(`Cell pressed - Hole ${hole.number}, Player ${player.username}`);
                         setSelectedCell({
                           playerId: player.id,
                           holeNumber: hole.number
