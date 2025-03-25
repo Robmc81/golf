@@ -277,6 +277,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#666',
   },
+  finishRoundButton: {
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  finishRoundText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });
 
 export default function Scorecard({ 
@@ -717,7 +730,22 @@ export default function Scorecard({
       </ScrollView>
       {scoreModal}
       
-      {/* Add this new footer section */}
+      {/* Add Finish Round Button */}
+      <TouchableOpacity 
+        style={styles.finishRoundButton}
+        onPress={() => {
+          if (roundId) {
+            router.push({
+              pathname: "/round-summary",
+              params: { roundId }
+            });
+          }
+        }}
+      >
+        <Text style={styles.finishRoundText}>Finish Round</Text>
+      </TouchableOpacity>
+
+      {/* Existing footer */}
       <View style={styles.footer}>
         <Text style={styles.roundIdText}>Round ID: {roundId || 'Not available'}</Text>
       </View>
