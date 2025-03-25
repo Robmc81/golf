@@ -109,12 +109,12 @@ export default function RoundSettingsScreen() {
         .eq('active', true)
         .single();
 
-      if (activeRoundError && activeRoundError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      if (activeRoundError && activeRoundError.code !== 'PGRST116') {
         console.error('Error checking active round:', activeRoundError);
         throw activeRoundError;
       }
 
-      // If there's an active round, navigate to it
+      // If there's an active round, navigate to it with the selected starting hole
       if (activeRound) {
         console.log('Found active round:', activeRound);
         router.push({
@@ -124,13 +124,13 @@ export default function RoundSettingsScreen() {
             courseName: activeRound.course,
             teeName: activeRound.tee_box,
             courseId: selectedCourse._id,
-            holeNumber: '1'
+            holeNumber: startingHole.toString()
           }
         });
         return;
       }
 
-      // No active round found, create a new one with existing logic
+      // No active round found, create a new one
       const { data: roundData, error } = await supabase
         .from('charlie_yates_scorecards')
         .insert({
@@ -140,7 +140,8 @@ export default function RoundSettingsScreen() {
           weather_conditions: null,
           playing_partners: [],
           tournament_round: false,
-          active: true, // Set the new round as active
+          active: true,
+          status: 'in_progress',
           // Initialize all hole data
           hole_1_score: null,
           hole_1_putts: null,
@@ -191,7 +192,6 @@ export default function RoundSettingsScreen() {
           total_putts: 0,
           fairways_hit: 0,
           greens_hit: 0,
-          status: 'in_progress',
           total_fairways: 0,
           total_gir: 0
         })
