@@ -110,6 +110,12 @@ export default function HoleViewScreen() {
   } | null>(null);
   const [roundId, setRoundId] = useState<string | null>(null);
 
+  // Add state for hole data
+  const [holeData, setHoleData] = useState<{
+    par: number;
+    handicap: number;
+  } | null>(null);
+
   /** Initialize map view when ready **/
   const handleMapReady = () => {
     if (mapRef.current) {
@@ -409,6 +415,29 @@ export default function HoleViewScreen() {
     }
   }, [session, roundId]); // Add roundId as dependency
 
+  // Add function to fetch hole data
+  const fetchHoleData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('charlie_yates_holes')
+        .select('par, handicap')
+        .eq('number', holeNumber)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setHoleData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching hole data:', error);
+    }
+  };
+
+  // Add useEffect to fetch hole data when hole number changes
+  useEffect(() => {
+    fetchHoleData();
+  }, [holeNumber]);
+
   // Add the scoreModal component
   const scoreModal = (
     <Modal
@@ -463,9 +492,13 @@ export default function HoleViewScreen() {
           <Text style={styles.yardage}>161 Yds</Text>
         </View>
         <View style={styles.courseInfo}>
-          <Text style={styles.infoText}>Par 3</Text>
+          <Text style={styles.infoText}>
+            Par {holeData?.par || '-'}
+          </Text>
           <Text style={styles.infoText}>Black 161</Text>
-          <Text style={styles.infoText}>Handicap 5</Text>
+          <Text style={styles.infoText}>
+            Handicap {holeData?.handicap || '-'}
+          </Text>
         </View>
         <TouchableOpacity style={styles.shareButton}>
           <Ionicons name="share-outline" size={24} color="white" />

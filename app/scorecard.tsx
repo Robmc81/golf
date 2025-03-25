@@ -289,7 +289,7 @@ export default function Scorecard({
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [holes, setHoles] = useState<{ number: number; par: number }[]>([]);
+  const [holes, setHoles] = useState<{ number: number; par: number; handicap: number }[]>([]);
   const [roundId, setRoundId] = useState<string | null>(initialRoundId || null);
   const [selectedCell, setSelectedCell] = useState<{
     playerId: string;
@@ -304,7 +304,7 @@ export default function Scorecard({
     try {
       const { data, error } = await supabase
         .from('charlie_yates_holes')
-        .select('*')
+        .select('number, par, handicap')
         .order('number');
       
       if (error) throw error;
@@ -611,6 +611,9 @@ export default function Scorecard({
               <Text style={styles.rowHeader}>Hole</Text>
             </View>
             <View style={styles.headerCell}>
+              <Text style={styles.rowHeader}>HCP</Text>
+            </View>
+            <View style={styles.headerCell}>
               <Text style={styles.rowHeader}>Par</Text>
             </View>
             {players.map((player) => (
@@ -633,6 +636,15 @@ export default function Scorecard({
                   {holes.map((hole) => (
                     <View key={hole.number} style={styles.gridCell}>
                       <Text style={styles.columnHeader}>{hole.number}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Handicap Row */}
+                <View style={styles.gridRow}>
+                  {holes.map((hole) => (
+                    <View key={hole.number} style={styles.gridCellData}>
+                      <Text style={styles.rowData}>{hole.handicap}</Text>
                     </View>
                   ))}
                 </View>
@@ -677,6 +689,11 @@ export default function Scorecard({
               {/* Header Cell */}
               <View style={styles.totalCell}>
                 <Text style={styles.totalText}>Total</Text>
+              </View>
+
+              {/* Empty Cell for Handicap Row */}
+              <View style={styles.totalCellData}>
+                <Text style={styles.totalText}></Text>
               </View>
 
               {/* Par Total */}
