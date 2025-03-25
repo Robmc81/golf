@@ -116,6 +116,9 @@ export default function HoleViewScreen() {
     handicap: number;
   } | null>(null);
 
+  // Add to your state declarations
+  const [teeBox, setTeeBox] = useState<string>('');
+
   /** Initialize map view when ready **/
   const handleMapReady = () => {
     if (mapRef.current) {
@@ -396,6 +399,9 @@ export default function HoleViewScreen() {
       if (data) {
         console.log('Found active round with ID:', data.id);
         setRoundId(data.id);
+        if (data.tee_box) {
+          setTeeBox(data.tee_box);
+        }
       } else {
         console.log('No data returned from Supabase');
       }
@@ -495,7 +501,7 @@ export default function HoleViewScreen() {
           <Text style={styles.infoText}>
             Par {holeData?.par || '-'}
           </Text>
-          <Text style={styles.infoText}>Black 161</Text>
+          <Text style={styles.infoText}>{teeBox} Tees</Text>
           <Text style={styles.infoText}>
             Handicap {holeData?.handicap || '-'}
           </Text>
@@ -981,4 +987,3 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 });
-

@@ -7,7 +7,9 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
 import { colors } from './constants/colors';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { SessionProvider } from './contexts/SessionContext';
+import { SessionProvider, useSessionContext } from './contexts/SessionContext';
+import { Redirect } from 'expo-router';
+import { View } from 'react-native';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -25,6 +27,8 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 export default function RootLayout(): JSX.Element | null {
+  const [session] = useSessionContext();
+
   const [loaded, error] = useFonts({
     ...FontAwesome.font,
   });
@@ -50,7 +54,12 @@ export default function RootLayout(): JSX.Element | null {
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack screenOptions={{ headerShown: false }}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+            }}
+            initialRouteName={session ? '(tabs)' : '(auth)'}
+          >
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen 

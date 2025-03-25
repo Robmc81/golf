@@ -1,4 +1,5 @@
 import { WEBFLOW_ACCESS_TOKEN, WEBFLOW_COURSES_COLLECTION_ID, WEBFLOW_SITE_ID } from '../constants/env';
+import { Platform } from 'react-native';
 
 export interface WebflowCourse {
   _id: string;
@@ -45,7 +46,8 @@ interface WebflowFieldData {
 const headers = {
   'Authorization': `Bearer ${WEBFLOW_ACCESS_TOKEN}`,
   'accept-version': '2.0.0',
-  'Content-Type': 'application/json'
+  'Content-Type': 'application/json',
+  'User-Agent': Platform.OS === 'ios' ? 'Golf-App-iOS/1.0' : 'Golf-App/1.0'
 };
 
 function processWebflowCourse(id: string, fieldData: WebflowFieldData): WebflowCourse {
@@ -76,26 +78,34 @@ export async function fetchCourses(): Promise<WebflowCourse[]> {
       throw new Error('Missing required environment variables');
     }
 
-    console.log('Fetching courses with token:', WEBFLOW_ACCESS_TOKEN?.substring(0, 10) + '...');
+    console.log(`Fetching courses on ${Platform.OS} with token:`, WEBFLOW_ACCESS_TOKEN?.substring(0, 10) + '...');
     console.log('Site ID:', WEBFLOW_SITE_ID);
     console.log('Collection ID:', WEBFLOW_COURSES_COLLECTION_ID);
 
     // First verify API access by checking sites
-    const sitesResponse = await fetch('https://api.webflow.com/v2/sites', { headers });
+    const sitesResponse = await fetch('https://api.webflow.com/v2/sites', { 
+      headers,
+      cache: Platform.OS === 'ios' ? 'no-store' : 'default'
+    });
+    
     if (!sitesResponse.ok) {
       const errorText = await sitesResponse.text();
       console.error('Webflow API Error (sites):', {
         status: sitesResponse.status,
         statusText: sitesResponse.statusText,
-        body: errorText
+        body: errorText,
+        platform: Platform.OS
       });
-      throw new Error(`HTTP error! status: ${sitesResponse.status}`);
+      throw new Error(`HTTP error! status: ${sitesResponse.status} - ${errorText}`);
     }
 
     // Then fetch courses from the collection
     const response = await fetch(
       `https://api.webflow.com/v2/collections/${WEBFLOW_COURSES_COLLECTION_ID}/items`,
-      { headers }
+      { 
+        headers,
+        cache: Platform.OS === 'ios' ? 'no-store' : 'default'
+      }
     );
 
     if (!response.ok) {
@@ -103,17 +113,23 @@ export async function fetchCourses(): Promise<WebflowCourse[]> {
       console.error('Webflow API Error (courses):', {
         status: response.status,
         statusText: response.statusText,
-        body: errorText
+        body: errorText,
+        platform: Platform.OS
       });
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json() as WebflowResponse<WebflowFieldData>;
-    console.log(`Found ${data.items.length} courses`);
+    console.log(`Found ${data.items.length} courses on ${Platform.OS}`);
 
     return data.items.map(item => processWebflowCourse(item.id, item.fieldData));
   } catch (error) {
-    console.error('Error fetching courses:', error);
+    console.error('Error fetching courses:', {
+      error,
+      platform: Platform.OS,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     throw error;
   }
 }

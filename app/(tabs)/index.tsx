@@ -18,9 +18,13 @@ export default function CoursesScreen() {
   }
 
   if (error) {
+    console.error('Courses error:', error);
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Error loading courses</Text>
+        <Text style={styles.errorDetails}>
+          {error instanceof Error ? error.message : 'Unknown error occurred'}
+        </Text>
       </View>
     );
   }
@@ -105,6 +109,10 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.error,
     fontSize: 16,
+  },
+  errorDetails: {
+    color: colors.textSecondary,
+    fontSize: 14,
   },
   listContent: {
     padding: 10,

@@ -540,7 +540,7 @@ export default function Scorecard({
 
   // Add a helper function to calculate total score
   const calculateTotal = (scores: (number | null)[]): number => {
-    return scores.reduce((sum, score) => sum + (score || 0), 0);
+    return scores.reduce((sum: number, score) => sum + (score || 0), 0);
   };
 
   if (isLoading) {
