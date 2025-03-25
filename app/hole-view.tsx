@@ -585,7 +585,14 @@ export default function HoleViewScreen() {
         {holeNumber === 9 ? (
           <TouchableOpacity 
             style={styles.nextHoleButton} 
-            onPress={handleBackToScorecard}
+            onPress={() => {
+              router.push({
+                pathname: "/scorecard",
+                params: {
+                  loadActive: "true"
+                }
+              });
+            }}
           >
             <Text style={styles.bottomButtonText}>End Round</Text>
           </TouchableOpacity>

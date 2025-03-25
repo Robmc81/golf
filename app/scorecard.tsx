@@ -354,7 +354,7 @@ export default function Scorecard({
     setDebugLogs(prev => [...prev, `[${timestamp}] ${message}`]);
   };
 
-  // Modify loadActiveRound to use the session from context
+  // Modify loadActiveRound function
   const loadActiveRound = async () => {
     try {
       addDebugLog('Starting loadActiveRound...');
@@ -372,7 +372,8 @@ export default function Scorecard({
         .from('charlie_yates_scorecards')
         .select('*')
         .eq('user_id', userId)
-        .not('active', 'is', null)
+        .eq('active', true)
+        .eq('status', 'in_progress')
         .single();
 
       if (error) {
@@ -435,6 +436,37 @@ export default function Scorecard({
     } catch (error) {
       addDebugLog(`Error in loadExistingScores: ${error}`);
       console.error('Error loading scores:', error);
+    }
+  };
+
+  // Update finishRound function
+  const finishRound = async (roundId: string) => {
+    try {
+      addDebugLog(`Finishing round: ${roundId}`);
+      const currentTimestamp = new Date().toISOString();
+      
+      const { data, error } = await supabase
+        .from('charlie_yates_scorecards')
+        .update({
+          active: false,
+          status: 'completed',
+          date_round_ended: currentTimestamp,
+          updated_at: currentTimestamp
+        })
+        .eq('id', roundId)
+        .select();
+
+      if (error) {
+        addDebugLog(`Error finishing round: ${error.message}`);
+        throw error;
+      }
+
+      addDebugLog('Round finished successfully');
+      addDebugLog(`Round end time recorded: ${currentTimestamp}`);
+      return data;
+    } catch (error) {
+      addDebugLog(`Unexpected error in finishRound: ${error}`);
+      throw error;
     }
   };
 
@@ -730,15 +762,21 @@ export default function Scorecard({
       </ScrollView>
       {scoreModal}
       
-      {/* Add Finish Round Button */}
+      {/* Update Finish Round Button */}
       <TouchableOpacity 
         style={styles.finishRoundButton}
-        onPress={() => {
+        onPress={async () => {
           if (roundId) {
-            router.push({
-              pathname: "/round-summary",
-              params: { roundId }
-            });
+            try {
+              await finishRound(roundId);
+              router.push({
+                pathname: "/round-summary",
+                params: { roundId }
+              });
+            } catch (error) {
+              console.error('Failed to finish round:', error);
+              alert('Failed to finish round. Please try again.');
+            }
           }
         }}
       >
