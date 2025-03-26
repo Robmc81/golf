@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, SafeAreaView, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import HoleSelectionModal from './hole-selection-modal';
@@ -49,6 +49,15 @@ interface RoundSettings {
   };
 }
 
+interface Profile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  username: string;
+  handicap: number | null;
+  avatar_url: string | null;
+}
+
 export default function RoundSettingsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -68,6 +77,7 @@ export default function RoundSettingsScreen() {
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [selectedGameType, setSelectedGameType] = useState('stroke');
   const [selectedCourse, setSelectedCourse] = useState(courses?.find(c => c._id === params.courseId));
+  const [selectedPlayers, setSelectedPlayers] = useState<Profile[]>([]);
 
   // Mock data for user groups - replace with actual data from your backend
   const userGroups: UserGroup[] = [
@@ -75,6 +85,18 @@ export default function RoundSettingsScreen() {
     { id: '2', name: 'Atlanta Golf Club', memberCount: 75 },
     { id: '3', name: 'Peachtree Golfers', memberCount: 200 },
   ];
+
+  // Update the useEffect to handle selected players from params
+  useEffect(() => {
+    if (params.selectedPlayers) {
+      try {
+        const players = JSON.parse(params.selectedPlayers as string);
+        setSelectedPlayers(players);
+      } catch (error) {
+        console.error('Error parsing selected players:', error);
+      }
+    }
+  }, [params.selectedPlayers]);
 
   const handleGameTypeSelect = (gameType: string) => {
     setSelectedGameType(gameType);
@@ -114,14 +136,14 @@ export default function RoundSettingsScreen() {
         throw activeRoundError;
       }
 
-      // If there's an active round, navigate to it with the selected starting hole
+      // If there's an active round, navigate to it
       if (activeRound) {
         console.log('Found active round:', activeRound);
         router.push({
           pathname: '/hole-view',
           params: {
             roundId: activeRound.id,
-            courseName: activeRound.course,
+            courseName: params.courseName,
             teeName: activeRound.tee_box,
             courseId: selectedCourse._id,
             holeNumber: startingHole.toString()
@@ -130,83 +152,123 @@ export default function RoundSettingsScreen() {
         return;
       }
 
-      // No active round found, create a new one
+      // Generate a numeric round group ID using timestamp
+      const roundGroupId = Date.now();
+      console.log('Creating new round with group ID:', roundGroupId);
+
+      // Create scorecard entries for all players including the current user
+      const allPlayers = [
+        { 
+          id: session.user.id, 
+          first_name: session.user.user_metadata?.first_name,
+          last_name: session.user.user_metadata?.last_name
+        },
+        ...selectedPlayers
+      ];
+
+      console.log('Creating scorecards for players:', allPlayers);
+
+      const scorecardData = allPlayers.map(player => ({
+        user_id: player.id,
+        round_group_id: roundGroupId,
+        date_played: new Date().toISOString(),
+        tee_box: selectedTee?.color || 'Black',
+        weather_conditions: null,
+        tournament_round: false,
+        active: true,
+        status: 'in_progress',
+        // Initialize all hole data
+        hole_1_score: null,
+        hole_1_putts: null,
+        hole_1_fairway: null,
+        hole_1_gir: null,
+        hole_1_notes: null,
+        hole_2_score: null,
+        hole_2_putts: null,
+        hole_2_fairway: null,
+        hole_2_gir: null,
+        hole_2_notes: null,
+        hole_3_score: null,
+        hole_3_putts: null,
+        hole_3_fairway: null,
+        hole_3_gir: null,
+        hole_3_notes: null,
+        hole_4_score: null,
+        hole_4_putts: null,
+        hole_4_fairway: null,
+        hole_4_gir: null,
+        hole_4_notes: null,
+        hole_5_score: null,
+        hole_5_putts: null,
+        hole_5_fairway: null,
+        hole_5_gir: null,
+        hole_5_notes: null,
+        hole_6_score: null,
+        hole_6_putts: null,
+        hole_6_fairway: null,
+        hole_6_gir: null,
+        hole_6_notes: null,
+        hole_7_score: null,
+        hole_7_putts: null,
+        hole_7_fairway: null,
+        hole_7_gir: null,
+        hole_7_notes: null,
+        hole_8_score: null,
+        hole_8_putts: null,
+        hole_8_fairway: null,
+        hole_8_gir: null,
+        hole_8_notes: null,
+        hole_9_score: null,
+        hole_9_putts: null,
+        hole_9_fairway: null,
+        hole_9_gir: null,
+        hole_9_notes: null,
+        total_score: 0,
+        total_putts: 0,
+        fairways_hit: 0,
+        greens_hit: 0,
+        total_fairways: 0,
+        total_gir: 0
+      }));
+
+      console.log('Attempting to insert scorecards:', scorecardData);
+
+      // Insert all scorecards at once
       const { data: roundData, error } = await supabase
         .from('charlie_yates_scorecards')
-        .insert({
-          user_id: session.user.id,
-          date_played: new Date().toISOString(),
-          tee_box: selectedTee?.color || 'Black',
-          weather_conditions: null,
-          playing_partners: [],
-          tournament_round: false,
-          active: true,
-          status: 'in_progress',
-          // Initialize all hole data
-          hole_1_score: null,
-          hole_1_putts: null,
-          hole_1_fairway: null,
-          hole_1_gir: null,
-          hole_1_notes: null,
-          hole_2_score: null,
-          hole_2_putts: null,
-          hole_2_fairway: null,
-          hole_2_gir: null,
-          hole_2_notes: null,
-          hole_3_score: null,
-          hole_3_putts: null,
-          hole_3_fairway: null,
-          hole_3_gir: null,
-          hole_3_notes: null,
-          hole_4_score: null,
-          hole_4_putts: null,
-          hole_4_fairway: null,
-          hole_4_gir: null,
-          hole_4_notes: null,
-          hole_5_score: null,
-          hole_5_putts: null,
-          hole_5_fairway: null,
-          hole_5_gir: null,
-          hole_5_notes: null,
-          hole_6_score: null,
-          hole_6_putts: null,
-          hole_6_fairway: null,
-          hole_6_gir: null,
-          hole_6_notes: null,
-          hole_7_score: null,
-          hole_7_putts: null,
-          hole_7_fairway: null,
-          hole_7_gir: null,
-          hole_7_notes: null,
-          hole_8_score: null,
-          hole_8_putts: null,
-          hole_8_fairway: null,
-          hole_8_gir: null,
-          hole_8_notes: null,
-          hole_9_score: null,
-          hole_9_putts: null,
-          hole_9_fairway: null,
-          hole_9_gir: null,
-          hole_9_notes: null,
-          total_score: 0,
-          total_putts: 0,
-          fairways_hit: 0,
-          greens_hit: 0,
-          total_fairways: 0,
-          total_gir: 0
-        })
-        .select()
-        .single();
+        .insert(scorecardData)
+        .select();
 
       if (error) {
         console.error('Supabase insert error:', error);
-        throw error;
+        alert(`Failed to create round: ${error.message}`);
+        return;
       }
 
+      if (!roundData || roundData.length === 0) {
+        console.error('No round data returned after insert');
+        alert('Failed to create round: No data returned');
+        return;
+      }
+
+      console.log('Successfully created rounds:', roundData);
+
+      // Find the current user's scorecard from the inserted data
+      const userScorecard = roundData.find(card => card.user_id === session.user.id);
+      if (!userScorecard) {
+        console.error('Could not find user scorecard in created rounds');
+        alert('Failed to create round: User scorecard not found');
+        return;
+      }
+
+      console.log('Navigating to hole view with scorecard:', userScorecard);
+
+      // Navigate to hole view with both roundId and roundGroupId
       router.push({
         pathname: '/hole-view',
         params: {
-          roundId: roundData.id,
+          roundId: userScorecard.id,
+          roundGroupId: userScorecard.round_group_id,
           courseName: params.courseName,
           teeName: selectedTee?.color || 'Black',
           courseId: selectedCourse._id,
@@ -215,8 +277,8 @@ export default function RoundSettingsScreen() {
       });
 
     } catch (error) {
-      console.error('Error creating round:', error);
-      alert('Failed to create round. Please try again.');
+      console.error('Error in handleStartRound:', error);
+      alert(`Failed to create round: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -288,6 +350,50 @@ export default function RoundSettingsScreen() {
     }
 
     return displayParts.length > 0 ? displayParts.join(', ') : 'Select Visibility';
+  };
+
+  const handleAddPlayers = () => {
+    router.push("/add-players");
+  };
+
+  const renderSelectedPlayers = () => {
+    if (selectedPlayers.length === 0) {
+      return (
+        <Text style={styles.noPlayersText}>No players added</Text>
+      );
+    }
+
+    return (
+      <View style={styles.selectedPlayersContainer}>
+        {selectedPlayers.map((player) => (
+          <View key={player.id} style={styles.selectedPlayerItem}>
+            <View style={styles.playerAvatarContainer}>
+              {player.avatar_url ? (
+                <Image source={{ uri: player.avatar_url }} style={styles.playerAvatar} />
+              ) : (
+                <View style={styles.playerAvatarPlaceholder}>
+                  <Text style={styles.playerAvatarText}>
+                    {player.first_name && player.last_name ? 
+                      `${player.first_name[0]}${player.last_name[0]}` : 
+                      '??'}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.playerInfo}>
+              <Text style={styles.playerName}>
+                {`${player.first_name} ${player.last_name}`}
+              </Text>
+              {player.handicap !== null && (
+                <Text style={styles.playerHandicap}>
+                  Handicap: {player.handicap}
+                </Text>
+              )}
+            </View>
+          </View>
+        ))}
+      </View>
+    );
   };
 
   return (
@@ -372,6 +478,25 @@ export default function RoundSettingsScreen() {
             <Text style={styles.buttonText}>{getGameTypeDisplay()}</Text>
             <Ionicons name="chevron-forward" size={20} color={colors.text} />
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Players</Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={handleAddPlayers}
+          >
+            <View style={styles.buttonContent}>
+              <Ionicons name="people-outline" size={24} color={colors.text} />
+              <Text style={styles.buttonText}>
+                {selectedPlayers.length > 0 
+                  ? `${selectedPlayers.length} Players Selected` 
+                  : 'Add Players'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text} />
+          </TouchableOpacity>
+          {renderSelectedPlayers()}
         </View>
 
         <TouchableOpacity 
@@ -525,5 +650,64 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 16,
     color: '#333',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  selectedPlayersContainer: {
+    marginTop: 16,
+  },
+  selectedPlayerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  playerAvatarContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#eee',
+  },
+  playerAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  playerAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playerAvatarText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  playerInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  playerName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  playerHandicap: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  noPlayersText: {
+    marginTop: 16,
+    textAlign: 'center',
+    color: '#666',
+    fontStyle: 'italic',
   },
 }); 

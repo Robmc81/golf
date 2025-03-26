@@ -91,6 +91,16 @@ export default function RootLayout(): JSX.Element | null {
                 headerTintColor: colors.text,
               }}
             />
+            <Stack.Screen
+              name="add-players"
+              options={{
+                title: 'Add Players',
+                headerStyle: {
+                  backgroundColor: colors.background,
+                },
+                headerTintColor: colors.text,
+              }}
+            />
           </Stack>
         </ThemeProvider>
       </QueryClientProvider>

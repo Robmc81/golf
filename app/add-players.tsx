@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,66 +8,64 @@ import {
   TextInput,
   SafeAreaView,
   Image,
-  ScrollView,
+  ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { CompetitiveOptionsModal } from './competitive-options-modal';
-import { GuestPlayerModal } from './guest-player-modal';
+import { supabase } from './lib/supabase';
 
-interface Player {
+interface Profile {
   id: string;
-  name: string;
-  avatar?: string;
-  lastPlayed?: string;
-  gender?: 'male' | 'female';
-  handicap?: number;
-  phone?: string;
-  email?: string;
-  isGuest?: boolean;
-  scores: (number | null)[];
-  netScores: (number | null)[];
+  first_name: string | null;
+  last_name: string | null;
+  username: string | null;
+  handicap: number | null;
+  avatar_url: string | null;
 }
 
-// Mock data - replace with actual data from your backend
-const recentPlayers: Player[] = [
-  { id: '1', name: 'John Smith', lastPlayed: '2 days ago', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
-  { id: '2', name: 'Mike Johnson', lastPlayed: '1 week ago', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
-  { id: '3', name: 'Sarah Williams', lastPlayed: '2 weeks ago', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
-  { id: '4', name: 'David Brown', lastPlayed: '3 weeks ago', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
-  { id: '5', name: 'Emma Davis', lastPlayed: '1 month ago', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
-];
+// Helper function to validate profile data
+const isValidProfile = (profile: Profile): boolean => {
+  return !!(
+    profile.id &&
+    profile.first_name &&
+    profile.last_name &&
+    profile.username
+  );
+};
 
-const allFriends: Player[] = [
-  { id: '6', name: 'Alex Wilson', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
-  { id: '7', name: 'Lisa Anderson', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
-  { id: '8', name: 'Tom Martinez', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
-  { id: '9', name: 'Rachel Lee', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
-  { id: '10', name: 'Chris Taylor', scores: Array(18).fill(null), netScores: Array(18).fill(null) },
-];
-
-interface Props {
-  isModal?: boolean;
-  onClose?: () => void;
-  onAddPlayers?: (players: Player[]) => void;
-  settings?: string;
-}
-
-export default function AddPlayersScreen({ 
-  isModal, 
-  onClose, 
-  onAddPlayers,
-  settings: initialSettings 
-}: Props = {}) {
+export default function AddPlayersScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const settings = initialSettings ? JSON.parse(initialSettings) : JSON.parse(params.settings as string);
   const [searchQuery, setSearchQuery] = useState('');
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
-  const [showCompetitiveOptions, setShowCompetitiveOptions] = useState(false);
-  const [selectedCompetitiveOption, setSelectedCompetitiveOption] = useState<string>();
-  const [showGuestPlayerModal, setShowGuestPlayerModal] = useState(false);
-  const [guestPlayers, setGuestPlayers] = useState<Player[]>([]);
+
+  useEffect(() => {
+    loadProfiles();
+  }, []);
+
+  const loadProfiles = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, username, handicap, avatar_url')
+        .order('first_name');
+
+      if (error) {
+        console.error('Error loading profiles:', error);
+        return;
+      }
+
+      // Filter out profiles with missing required data
+      const validProfiles = (data || []).filter(isValidProfile);
+      setProfiles(validProfiles);
+    } catch (error) {
+      console.error('Error in loadProfiles:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePlayerSelect = (playerId: string) => {
     setSelectedPlayers(prev => {
@@ -81,306 +79,109 @@ export default function AddPlayersScreen({
     });
   };
 
-  const handleCompetitiveOptionSelect = (optionId: string) => {
-    setSelectedCompetitiveOption(optionId);
-    setSelectedPlayers(prev => {
-      const newSet = new Set(prev);
-      // Remove any existing competitive options
-      ['last-round', 'course-average', 'best-round', 'best-by-hole', 'course-record'].forEach(id => {
-        newSet.delete(id);
-      });
-      // Add the new selection
-      newSet.add(optionId);
-      return newSet;
-    });
-    setShowCompetitiveOptions(false);
+  const handleDone = () => {
+    const selectedPlayersList = profiles.filter(profile => 
+      selectedPlayers.has(profile.id)
+    );
+    router.back();
+    // Pass selected players back to round settings
+    router.setParams({ selectedPlayers: JSON.stringify(selectedPlayersList) });
   };
 
-  const handleAddGuestPlayer = (player: {
-    name: string;
-    gender: 'male' | 'female';
-    handicap?: number;
-    phone?: string;
-    email?: string;
-  }) => {
-    const newGuestPlayer: Player = {
-      id: `guest-${Date.now()}`,
-      name: player.name,
-      gender: player.gender,
-      handicap: player.handicap,
-      phone: player.phone,
-      email: player.email,
-      isGuest: true,
-      scores: Array(18).fill(null),
-      netScores: Array(18).fill(null),
-    };
-    setGuestPlayers(prev => [...prev, newGuestPlayer]);
-    // Automatically select the new guest player
-    setSelectedPlayers(prev => new Set([...prev, newGuestPlayer.id]));
-  };
+  const filteredProfiles = profiles.filter(profile => {
+    // Additional safety check
+    if (!isValidProfile(profile)) return false;
+    
+    return `${profile.first_name} ${profile.last_name} ${profile.username}`
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+  });
 
-  const handleStartRound = () => {
-    if (isModal && onAddPlayers) {
-      const selectedPlayersList = [...selectedPlayers].map(id => {
-        const player = [...recentPlayers, ...allFriends, ...guestPlayers].find(p => p.id === id);
-        if (!player) return null;
-        
-        const newPlayer: Player = {
-          id,
-          name: player.name,
-          scores: player.scores,
-          netScores: player.netScores,
-          avatar: player.avatar,
-          gender: player.gender,
-          handicap: player.handicap,
-          phone: player.phone,
-          email: player.email,
-          isGuest: player.isGuest,
-        };
-        
-        return newPlayer;
-      }).filter((player): player is Player => player !== null);
+  const renderProfile = ({ item }: { item: Profile }) => {
+    // Extra safety check - skip rendering if profile is invalid
+    if (!isValidProfile(item)) return null;
 
-      onAddPlayers(selectedPlayersList);
-      onClose?.();
-    } else {
-      const selectedPlayersList = [...selectedPlayers].map(id => {
-        const player = [...recentPlayers, ...allFriends, ...guestPlayers].find(p => p.id === id);
-        if (!player) return null;
-        
-        const newPlayer: Player = {
-          id,
-          name: player.name,
-          scores: player.scores,
-          netScores: player.netScores,
-          avatar: player.avatar,
-          gender: player.gender,
-          handicap: player.handicap,
-          phone: player.phone,
-          email: player.email,
-          isGuest: player.isGuest,
-        };
-        
-        return newPlayer;
-      }).filter((player): player is Player => player !== null);
+    const isSelected = selectedPlayers.has(item.id);
 
-      // Handle competitive options
-      const competitiveOptions = selectedCompetitiveOption ? {
-        type: selectedCompetitiveOption,
-        target: selectedCompetitiveOption === 'last-round' ? 'last' :
-                selectedCompetitiveOption === 'course-average' ? 'average' :
-                selectedCompetitiveOption === 'best-round' ? 'best' :
-                selectedCompetitiveOption === 'best-by-hole' ? 'best-hole' :
-                selectedCompetitiveOption === 'course-record' ? 'record' : 'none'
-      } : undefined;
+    return (
+      <TouchableOpacity 
+        style={[styles.profileItem, isSelected && styles.profileItemSelected]}
+        onPress={() => handlePlayerSelect(item.id)}
+      >
+        <View style={styles.profileInfo}>
+          {/* Avatar */}
+          <View style={styles.avatarContainer}>
+            {item.avatar_url ? (
+              <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarText}>
+                  {item.first_name && item.last_name ? 
+                    `${item.first_name[0]}${item.last_name[0]}` : 
+                    '??'}
+                </Text>
+              </View>
+            )}
+          </View>
 
-      router.push({
-        pathname: '/hole-view' as any,
-        params: {
-          ...params,
-          settings: JSON.stringify({
-            ...settings,
-            players: selectedPlayersList,
-            competitiveOptions,
-          }),
-        },
-      });
-    }
-  };
+          {/* Profile Details */}
+          <View style={styles.details}>
+            <Text style={styles.name}>{`${item.first_name} ${item.last_name}`}</Text>
+            <Text style={styles.username}>@{item.username}</Text>
+            {item.handicap !== null && (
+              <Text style={styles.handicap}>Handicap: {item.handicap}</Text>
+            )}
+          </View>
 
-  const renderPlayerItem = ({ item }: { item: Player }) => (
-    <TouchableOpacity
-      style={[
-        styles.playerItem,
-        selectedPlayers.has(item.id) && styles.playerItemSelected,
-        item.isGuest && styles.guestPlayerItem,
-      ]}
-      onPress={() => handlePlayerSelect(item.id)}
-    >
-      <View style={styles.playerInfo}>
-        <View style={styles.avatarContainer}>
-          {item.avatar ? (
-            <Image source={{ uri: item.avatar }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatarPlaceholder, item.isGuest && styles.guestAvatarPlaceholder]}>
-              <Text style={styles.avatarText}>
-                {item.name.split(' ').map(n => n[0]).join('')}
-              </Text>
+          {/* Selection Indicator */}
+          {isSelected && (
+            <View style={styles.checkmarkContainer}>
+              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
             </View>
           )}
         </View>
-        <View style={styles.playerDetails}>
-          <Text style={styles.playerName}>
-            {item.name}
-            {item.isGuest && <Text style={styles.guestBadge}> (Guest)</Text>}
-          </Text>
-          {item.lastPlayed && (
-            <Text style={styles.lastPlayed}>Last played: {item.lastPlayed}</Text>
-          )}
-          {item.handicap !== undefined && (
-            <Text style={styles.playerDetails}>Handicap: {item.handicap}</Text>
-          )}
-        </View>
-      </View>
-      {selectedPlayers.has(item.id) && (
-        <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-      )}
-    </TouchableOpacity>
-  );
-
-  const allPlayers = [...recentPlayers, ...allFriends, ...guestPlayers];
-  const filteredPlayers = allPlayers.filter(player =>
-    player.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const renderSelectedPlayerAvatar = (playerId: string) => {
-    const player = [...recentPlayers, ...allFriends, ...guestPlayers].find(p => p.id === playerId);
-    if (!player) return null;
-
-    return (
-      <View key={playerId} style={styles.selectedPlayerAvatar}>
-        {player.avatar ? (
-          <Image source={{ uri: player.avatar }} style={styles.selectedAvatarImage} />
-        ) : (
-          <View style={[
-            styles.selectedAvatarPlaceholder,
-            player.isGuest && styles.selectedGuestAvatarPlaceholder
-          ]}>
-            <Text style={styles.selectedAvatarText}>
-              {player.name.split(' ').map(n => n[0]).join('')}
-            </Text>
-          </View>
-        )}
-        <Text style={styles.selectedPlayerName} numberOfLines={1}>
-          {player.name}
-        </Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={isModal ? onClose : () => router.back()}
-        >
+        <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Add Players</Text>
-        <TouchableOpacity
-          style={styles.skipButton}
-          onPress={() => {
-            if (isModal && onClose) {
-              onClose();
-            } else {
-              router.push({
-                pathname: '/hole-view' as any,
-                params: {
-                  ...params,
-                  settings: JSON.stringify({
-                    ...settings,
-                    players: [],
-                    competitiveOptions: undefined,
-                  }),
-                },
-              });
-            }
-          }}
-        >
-          <Text style={styles.skipButtonText}>Skip</Text>
+        <TouchableOpacity onPress={handleDone}>
+          <Text style={styles.doneButton}>Done ({selectedPlayers.size})</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+        <Ionicons name="search" size={20} color="#666" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search friends..."
+          placeholder="Search players..."
           value={searchQuery}
           onChangeText={setSearchQuery}
+          placeholderTextColor="#666"
         />
       </View>
 
-      <TouchableOpacity
-        style={styles.competitiveButton}
-        onPress={() => setShowCompetitiveOptions(true)}
-      >
-        <View style={styles.competitiveButtonContent}>
-          <Ionicons name="trophy-outline" size={24} color="#4CAF50" />
-          <View style={styles.competitiveButtonText}>
-            <Text style={styles.competitiveButtonTitle}>Play Against Your Best Scores</Text>
-            <Text style={styles.competitiveButtonSubtitle}>
-              {selectedCompetitiveOption ? 'Selected' : 'Select a competitive option'}
-            </Text>
-          </View>
+      {/* Players List */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
         </View>
-        <Ionicons name="chevron-forward" size={24} color="#666" />
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.addGuestButton}
-        onPress={() => setShowGuestPlayerModal(true)}
-      >
-        <View style={styles.addGuestButtonContent}>
-          <Ionicons name="person-add-outline" size={24} color="#4CAF50" />
-          <Text style={styles.addGuestButtonText}>Write-In Guest Player</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={24} color="#666" />
-      </TouchableOpacity>
-
-      <FlatList
-        data={filteredPlayers}
-        renderItem={renderPlayerItem}
-        keyExtractor={item => item.id}
-        ListHeaderComponent={
-          <>
-            <Text style={styles.sectionTitle}>Recently Played With</Text>
-            {recentPlayers.map(player => renderPlayerItem({ item: player }))}
-            {guestPlayers.length > 0 && (
-              <>
-                <Text style={styles.sectionTitle}>Guest Players</Text>
-                {guestPlayers.map(player => renderPlayerItem({ item: player }))}
-              </>
-            )}
-            <Text style={styles.sectionTitle}>All Friends</Text>
-          </>
-        }
-      />
-
-      <CompetitiveOptionsModal
-        visible={showCompetitiveOptions}
-        onClose={() => setShowCompetitiveOptions(false)}
-        onSelect={handleCompetitiveOptionSelect}
-        selectedOption={selectedCompetitiveOption}
-      />
-
-      <GuestPlayerModal
-        visible={showGuestPlayerModal}
-        onClose={() => setShowGuestPlayerModal(false)}
-        onAdd={handleAddGuestPlayer}
-      />
-
-      <View style={styles.footer}>
-        <Text style={styles.selectedCount}>
-          {selectedPlayers.size} player{selectedPlayers.size !== 1 ? 's' : ''} selected
-        </Text>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          style={styles.selectedPlayersContainer}
-        >
-          {[...selectedPlayers].map(renderSelectedPlayerAvatar)}
-        </ScrollView>
-        <TouchableOpacity
-          style={styles.startButton}
-          onPress={handleStartRound}
-        >
-          <Text style={styles.startButtonText}>
-            {isModal ? "Add to Round" : "Start Round"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      ) : (
+        <FlatList
+          data={filteredProfiles}
+          renderItem={renderProfile}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -398,60 +199,51 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  backButton: {
-    padding: 8,
-  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
-    marginLeft: 8,
+    color: '#000',
+  },
+  doneButton: {
+    fontSize: 16,
+    color: '#4CAF50',
+    fontWeight: '600',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: '#f5f5f5',
     margin: 16,
+    backgroundColor: '#f5f5f5',
     borderRadius: 8,
-  },
-  searchIcon: {
-    marginRight: 8,
   },
   searchInput: {
     flex: 1,
+    marginLeft: 8,
     fontSize: 16,
-    color: '#333',
+    color: '#000',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+  listContainer: {
     padding: 16,
-    paddingBottom: 8,
   },
-  playerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
+  profileItem: {
+    padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  playerItemSelected: {
+  profileItemSelected: {
     backgroundColor: '#f0f9f0',
   },
-  playerInfo: {
+  profileInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
   avatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     overflow: 'hidden',
-    marginRight: 12,
+    backgroundColor: '#eee',
   },
   avatar: {
     width: '100%',
@@ -466,144 +258,34 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
   },
-  playerDetails: {
+  details: {
+    marginLeft: 12,
     flex: 1,
   },
-  playerName: {
+  name: {
     fontSize: 16,
-    color: '#333',
-    marginBottom: 4,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 2,
   },
-  lastPlayed: {
+  username: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 2,
+  },
+  handicap: {
     fontSize: 14,
     color: '#666',
   },
-  footer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  selectedCount: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 12,
-  },
-  selectedPlayersContainer: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  selectedPlayerAvatar: {
-    alignItems: 'center',
-    marginRight: 12,
-    width: 60,
-  },
-  selectedAvatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginBottom: 4,
-  },
-  selectedAvatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#4CAF50',
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
   },
-  selectedGuestAvatarPlaceholder: {
-    backgroundColor: '#FFA726',
-  },
-  selectedAvatarText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  selectedPlayerName: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
-  startButton: {
-    backgroundColor: '#4CAF50',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  startButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  competitiveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    marginTop: 8,
-  },
-  competitiveButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  competitiveButtonText: {
+  checkmarkContainer: {
     marginLeft: 12,
-  },
-  competitiveButtonTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  competitiveButtonSubtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
-  addGuestButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    marginTop: 8,
-  },
-  addGuestButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  addGuestButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginLeft: 12,
-  },
-  guestPlayerItem: {
-    backgroundColor: '#f8f9fa',
-  },
-  guestAvatarPlaceholder: {
-    backgroundColor: '#FFA726',
-  },
-  guestBadge: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 4,
-  },
-  skipButton: {
-    padding: 8,
-  },
-  skipButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '600',
   },
 }); 
