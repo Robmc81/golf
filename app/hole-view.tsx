@@ -123,6 +123,9 @@ export default function HoleViewScreen() {
   // Add this state for all players in the round
   const [roundPlayers, setRoundPlayers] = useState<Player[]>([]);
 
+  // Add state to track entered scores
+  const [enteredScores, setEnteredScores] = useState<{[key: string]: number}>({});
+
   /** Initialize map view when ready **/
   const handleMapReady = () => {
     if (mapRef.current) {
@@ -208,6 +211,11 @@ export default function HoleViewScreen() {
     try {
       await saveScore(selectedCell.playerId, selectedCell.holeNumber, score);
       console.log('Score saved successfully');
+      // Add the score to enteredScores
+      setEnteredScores(prev => ({
+        ...prev,
+        [selectedCell.playerId]: score
+      }));
       setSelectedCell(null);
     } catch (error) {
       console.error('Failed to save score:', error);
@@ -500,12 +508,22 @@ export default function HoleViewScreen() {
                   holeNumber: holeNumber
                 })}
               >
-                <Text style={[
-                  styles.playerName,
-                  selectedCell?.playerId === player.id && styles.playerNameSelected
-                ]}>
-                  {player.username}
-                </Text>
+                <View style={styles.playerItemContent}>
+                  <Text style={[
+                    styles.playerName,
+                    selectedCell?.playerId === player.id && styles.playerNameSelected
+                  ]}>
+                    {player.username}
+                  </Text>
+                  {enteredScores[player.id] !== undefined && (
+                    <Text style={[
+                      styles.enteredScore,
+                      selectedCell?.playerId === player.id && styles.enteredScoreSelected
+                    ]}>
+                      Score: {enteredScores[player.id]}
+                    </Text>
+                  )}
+                </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -1080,5 +1098,18 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  playerItemContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  enteredScore: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  enteredScoreSelected: {
+    color: '#fff',
   },
 });
