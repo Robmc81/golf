@@ -61,7 +61,7 @@ export default function RoundSummary() {
     let total = 0;
     for (let i = 1; i <= 9; i++) {
       const score = data[`hole_${i}_score` as keyof RoundSummary];
-      if (score) total += score;
+      if (typeof score === 'number') total += score;
     }
     return total;
   };

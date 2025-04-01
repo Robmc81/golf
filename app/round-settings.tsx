@@ -430,7 +430,7 @@ export default function RoundSettingsScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Round Type</Text>
           <View style={styles.roundTypeContainer}>
@@ -456,6 +456,25 @@ export default function RoundSettingsScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Players</Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={handleAddPlayers}
+          >
+            <View style={styles.buttonContent}>
+              <Ionicons name="people-outline" size={24} color={colors.text} />
+              <Text style={styles.buttonText}>
+                {selectedPlayers.length > 0 
+                  ? `${selectedPlayers.length} Players Selected` 
+                  : 'Add Players'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text} />
+          </TouchableOpacity>
+          {renderSelectedPlayers()}
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Starting From</Text>
           <TouchableOpacity 
             style={styles.startingHoleButton}
@@ -478,17 +497,6 @@ export default function RoundSettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Round Visibility</Text>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => setShowVisibilitySelection(true)}
-          >
-            <Text style={styles.buttonText}>{getVisibilityDisplay()}</Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.text} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Game Type</Text>
           <TouchableOpacity
             style={styles.button}
@@ -500,31 +508,27 @@ export default function RoundSettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Players</Text>
+          <Text style={styles.sectionTitle}>Round Visibility</Text>
           <TouchableOpacity
             style={styles.button}
-            onPress={handleAddPlayers}
+            onPress={() => setShowVisibilitySelection(true)}
           >
-            <View style={styles.buttonContent}>
-              <Ionicons name="people-outline" size={24} color={colors.text} />
-              <Text style={styles.buttonText}>
-                {selectedPlayers.length > 0 
-                  ? `${selectedPlayers.length} Players Selected` 
-                  : 'Add Players'}
-              </Text>
-            </View>
+            <Text style={styles.buttonText}>{getVisibilityDisplay()}</Text>
             <Ionicons name="chevron-forward" size={20} color={colors.text} />
           </TouchableOpacity>
-          {renderSelectedPlayers()}
         </View>
 
+        <View style={styles.bottomSpacing} />
+      </ScrollView>
+
+      <View style={styles.startButtonContainer}>
         <TouchableOpacity 
           style={styles.startButton}
           onPress={handleStartRound}
         >
           <Text style={styles.startButtonText}>Start Round</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
 
       <HoleSelectionModal
         visible={showHoleSelection}
@@ -590,6 +594,12 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  scrollContent: {
+    paddingBottom: 16,
+  },
+  bottomSpacing: {
+    height: 80, // Space for the fixed button
+  },
   section: {
     padding: 16,
     borderBottomWidth: 1,
@@ -646,11 +656,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+  startButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
   startButton: {
-    margin: 16,
-    backgroundColor: '#4CAF50',
-    padding: 16,
+    backgroundColor: colors.primary,
     borderRadius: 8,
+    paddingVertical: 16,
     alignItems: 'center',
   },
   startButtonText: {

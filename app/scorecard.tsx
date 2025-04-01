@@ -835,10 +835,7 @@ export default function Scorecard({
           if (roundId) {
             try {
               await finishRound(roundId);
-              router.push({
-                pathname: "/round-summary",
-                params: { roundId }
-              });
+              router.replace(`/round-summary?roundId=${roundId}` as any);
             } catch (error) {
               console.error('Failed to finish round:', error);
               alert('Failed to finish round. Please try again.');
