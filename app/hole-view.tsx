@@ -205,29 +205,10 @@ export default function HoleViewScreen() {
       return;
     }
 
-    if (!session?.user) {
-      console.error('No user session');
-      return;
-    }
-
-    if (!roundId) {
-      console.error('No round ID available');
-      return;
-    }
-
-    console.log('Score selected:', {
-      playerId: selectedCell.playerId,
-      holeNumber: selectedCell.holeNumber,
-      score,
-      roundId
-    });
-
     try {
       await saveScore(selectedCell.playerId, selectedCell.holeNumber, score);
       console.log('Score saved successfully');
-      setShowScoreModal(false);
       setSelectedCell(null);
-      setShowNextHolePrompt(true);
     } catch (error) {
       console.error('Failed to save score:', error);
       alert('Failed to save score. Please try again.');
@@ -545,6 +526,17 @@ export default function HoleViewScreen() {
               ))}
             </View>
           )}
+
+          {/* Add Done button at the bottom */}
+          <TouchableOpacity 
+            style={styles.doneButton}
+            onPress={() => {
+              setShowScoreModal(false);
+              setShowNextHolePrompt(true);
+            }}
+          >
+            <Text style={styles.doneButtonText}>Done</Text>
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     </Modal>
@@ -1076,5 +1068,17 @@ const styles = StyleSheet.create({
   },
   playerNameSelected: {
     color: '#fff',
+  },
+  doneButton: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  doneButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
