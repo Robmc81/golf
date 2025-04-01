@@ -156,20 +156,39 @@ export default function RoundSettingsScreen() {
       const roundGroupId = Date.now();
       console.log('Creating new round with group ID:', roundGroupId);
 
+      // Get current user's profile data
+      const { data: currentUserProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, username')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching current user profile:', profileError);
+        throw profileError;
+      }
+
+      console.log('Current user profile:', currentUserProfile);
+
       // Create scorecard entries for all players including the current user
       const allPlayers = [
         { 
-          id: session.user.id, 
-          first_name: session.user.user_metadata?.first_name,
-          last_name: session.user.user_metadata?.last_name
+          id: session.user.id,
+          username: currentUserProfile.username || 
+                   `${currentUserProfile.first_name} ${currentUserProfile.last_name}` ||
+                   session.user.email
         },
-        ...selectedPlayers
+        ...selectedPlayers.map(player => ({
+          id: player.id,
+          username: player.username || `${player.first_name} ${player.last_name}`
+        }))
       ];
 
-      console.log('Creating scorecards for players:', allPlayers);
+      console.log('All players with usernames:', allPlayers);
 
       const scorecardData = allPlayers.map(player => ({
         user_id: player.id,
+        username: player.username, // Now using the correct username
         round_group_id: roundGroupId,
         date_played: new Date().toISOString(),
         tee_box: selectedTee?.color || 'Black',
@@ -231,7 +250,7 @@ export default function RoundSettingsScreen() {
         total_gir: 0
       }));
 
-      console.log('Attempting to insert scorecards:', scorecardData);
+      console.log('Final scorecard data to be inserted:', scorecardData);
 
       // Insert all scorecards at once
       const { data: roundData, error } = await supabase

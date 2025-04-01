@@ -9,6 +9,7 @@ interface Player {
   id: string;
   username: string;
   scores: (number | null)[];
+  roundId: string;
 }
 
 interface Props {
@@ -21,6 +22,7 @@ interface Props {
 interface DatabaseRound {
   id: string;
   user_id: string;
+  round_group_id: string;
   date_played: string;
   course: string;
   tee_box: string;
@@ -49,6 +51,12 @@ interface DatabaseScore {
 
 interface HoleScores {
   [key: `hole_${number}_score`]: number | null;
+}
+
+interface RoundGroupPlayer {
+  user_id: string;
+  round_id: string;
+  username: string;
 }
 
 const styles = StyleSheet.create({
@@ -327,24 +335,80 @@ export default function Scorecard({
     }
   };
 
-  // Fetch available players from Supabase profiles
+  // Fetch available players from Supabase scorecards
   const fetchPlayers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username');
+      if (!roundId || !session?.user) {
+        console.error('No roundId or session user available');
+        return;
+      }
+
+      addDebugLog('Fetching players for round...');
+
+      // First get the round_group_id for the current round
+      const { data: roundData, error: roundError } = await supabase
+        .from('charlie_yates_scorecards')
+        .select('round_group_id, username')
+        .eq('id', roundId)
+        .single();
+
+      if (roundError) {
+        addDebugLog(`Error fetching round_group_id: ${roundError.message}`);
+        throw roundError;
+      }
       
-      if (error) throw error;
-      
-      const playersWithScores = (data || []).map(player => ({
-        id: player.id,
-        username: player.username,
+      if (!roundData?.round_group_id) {
+        addDebugLog('No round_group_id found');
+        // If no group found, at least show the current user with their username
+        const { data: currentRound } = await supabase
+          .from('charlie_yates_scorecards')
+          .select('username')
+          .eq('id', roundId)
+          .single();
+
+        setPlayers([{
+          id: session.user.id,
+          username: currentRound?.username || 'Unknown',
+          roundId: roundId,
+          scores: Array(18).fill(null)
+        }]);
+        return;
+      }
+
+      addDebugLog(`Found round_group_id: ${roundData.round_group_id}`);
+
+      // Fetch all rounds with the same round_group_id, including usernames
+      const { data: groupRounds, error: groupError } = await supabase
+        .from('charlie_yates_scorecards')
+        .select('id, user_id, username')
+        .eq('round_group_id', roundData.round_group_id);
+
+      if (groupError) {
+        addDebugLog(`Error fetching group rounds: ${groupError.message}`);
+        throw groupError;
+      }
+
+      addDebugLog(`Found ${groupRounds?.length || 0} players in round group`);
+
+      // Transform the data into the Player format, using the stored username
+      const playersWithScores = (groupRounds || []).map(round => ({
+        id: round.user_id,
+        username: round.username || 'Unknown Player',
+        roundId: round.id,
         scores: Array(18).fill(null)
       }));
-      
+
+      addDebugLog(`Transformed players: ${JSON.stringify(playersWithScores)}`);
       setPlayers(playersWithScores);
+
+      // Load scores for all players
+      await Promise.all(playersWithScores.map(player => 
+        loadExistingScores(player.roundId, player.id)
+      ));
+
     } catch (error) {
       console.error('Error fetching players:', error);
+      addDebugLog(`Error fetching players: ${error}`);
     }
   };
 
@@ -399,14 +463,14 @@ export default function Scorecard({
     }
   };
 
-  // Modify loadExistingScores to properly map the hole scores
-  const loadExistingScores = async (roundId: string) => {
+  // Modify loadExistingScores to handle multiple players
+  const loadExistingScores = async (playerRoundId: string, playerId: string) => {
     try {
-      addDebugLog(`Loading scores for round ID: ${roundId}`);
+      addDebugLog(`Loading scores for player ${playerId}, round ID: ${playerRoundId}`);
       const { data, error } = await supabase
         .from('charlie_yates_scorecards')
         .select('*')
-        .eq('id', roundId)
+        .eq('id', playerRoundId)
         .single();
 
       if (error) {
@@ -416,22 +480,17 @@ export default function Scorecard({
 
       if (data) {
         addDebugLog('Found scorecard data, mapping scores...');
-        // Update players with the correct scores
         setPlayers(prev => prev.map(player => {
-          if (player.id === data.user_id) {
-            // Map all 9 holes' scores, ensuring correct alignment
+          if (player.id === playerId) {
             const scores = Array(9).fill(null).map((_, index) => {
               const holeNumber = index + 1;
               const score = data[`hole_${holeNumber}_score`];
-              addDebugLog(`Hole ${holeNumber}: Score = ${score}`);
               return score || null;
             });
             return { ...player, scores };
           }
           return player;
         }));
-      } else {
-        addDebugLog('No scorecard data found');
       }
     } catch (error) {
       addDebugLog(`Error in loadExistingScores: ${error}`);
@@ -491,11 +550,19 @@ export default function Scorecard({
           setRoundId(initialRoundId);
         }
 
-        await Promise.all([fetchHoles(), fetchPlayers()]);
-
-        if (currentRoundId) {
-          await loadExistingScores(currentRoundId);
+        if (!currentRoundId) {
+          addDebugLog('No round ID available after initialization');
+          return;
         }
+
+        addDebugLog(`Initializing with round ID: ${currentRoundId}`);
+        
+        // First fetch holes data
+        await fetchHoles();
+        
+        // Then fetch players and their scores
+        await fetchPlayers();
+
       } catch (error) {
         console.error('Initialization error:', error);
         addDebugLog(`Initialization error: ${error}`);
@@ -505,41 +572,41 @@ export default function Scorecard({
     };
 
     initialize();
-  }, [session]); // Add session to dependencies
+  }, [session, roundId]); // Add roundId to dependencies
 
-  // Update the saveScore function to be more explicit
+  // Update the saveScore function to use the correct round ID for each player
   const saveScore = async (playerId: string, holeNumber: number, score: number) => {
-    if (!roundId) {
-      console.error('No roundId available');
+    const player = players.find(p => p.id === playerId);
+    if (!player?.roundId) {
+      console.error('No roundId available for player');
       return;
     }
 
-    console.log('Saving score:', { playerId, holeNumber, score, roundId });
+    console.log('Saving score:', { playerId, holeNumber, score, roundId: player.roundId });
 
     try {
-      // First update local state for immediate UI feedback
+      // Update local state
       setPlayers(prevPlayers => {
-        return prevPlayers.map(player => {
-          if (player.id === playerId) {
-            const newScores = [...player.scores];
+        return prevPlayers.map(p => {
+          if (p.id === playerId) {
+            const newScores = [...p.scores];
             newScores[holeNumber - 1] = score;
-            return { ...player, scores: newScores };
+            return { ...p, scores: newScores };
           }
-          return player;
+          return p;
         });
       });
 
-      // Create the column name based on the hole number
       const scoreColumn = `hole_${holeNumber}_score`;
       
-      // Update the specific hole's score in the scorecard
+      // Update the database using the player's specific round ID
       const { data, error } = await supabase
         .from('charlie_yates_scorecards')
         .update({
           [scoreColumn]: score,
           updated_at: new Date().toISOString()
         })
-        .eq('id', roundId)
+        .eq('id', player.roundId)
         .eq('user_id', playerId)
         .select();
 
@@ -552,8 +619,7 @@ export default function Scorecard({
 
     } catch (error) {
       console.error('Error saving score:', error);
-      // Revert the local state if the save failed
-      loadExistingScores(roundId);
+      loadExistingScores(player.roundId, playerId);
       alert('Failed to save score. Please try again.');
     }
   };
