@@ -52,6 +52,7 @@ interface Player {
   id: string;
   username: string;
   scores: (number | null)[];
+  roundId: string;
 }
 
 const saveScoresToBackend = async ({
@@ -84,10 +85,10 @@ export default function HoleViewScreen() {
   const [showWindSlope, setShowWindSlope] = useState(false);
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [players] = useState<Player[]>([
-    { id: '1', username: 'Player 1', scores: [] },
-    { id: '2', username: 'Player 2', scores: [] },
-    { id: '3', username: 'Player 3', scores: [] },
-    { id: '4', username: 'Player 4', scores: [] },
+    { id: '1', username: 'Player 1', scores: [], roundId: '' },
+    { id: '2', username: 'Player 2', scores: [], roundId: '' },
+    { id: '3', username: 'Player 3', scores: [], roundId: '' },
+    { id: '4', username: 'Player 4', scores: [], roundId: '' },
   ]);
   
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>(players[0].id);
@@ -118,6 +119,9 @@ export default function HoleViewScreen() {
 
   // Add to your state declarations
   const [teeBox, setTeeBox] = useState<string>('');
+
+  // Add this state for all players in the round
+  const [roundPlayers, setRoundPlayers] = useState<Player[]>([]);
 
   /** Initialize map view when ready **/
   const handleMapReady = () => {
@@ -186,25 +190,12 @@ export default function HoleViewScreen() {
   /** Handle score entry **/
   const handleScoreEntry = () => {
     console.log('handleScoreEntry called');
-    console.log('Current session:', session?.user);
-    console.log('Current roundId:', roundId);
-
-    if (!session?.user) {
-      console.error('No user session in handleScoreEntry');
-      alert('Please log in to enter scores');
-      return;
-    }
-
     if (!roundId) {
       console.error('No active round found in handleScoreEntry');
       alert('No active round found. Please start a round first.');
       return;
     }
     
-    setSelectedCell({
-      playerId: session.user.id,
-      holeNumber: holeNumber
-    });
     setShowScoreModal(true);
   };
 
@@ -232,7 +223,7 @@ export default function HoleViewScreen() {
     });
 
     try {
-      await saveScore(session.user.id, selectedCell.holeNumber, score);
+      await saveScore(selectedCell.playerId, selectedCell.holeNumber, score);
       console.log('Score saved successfully');
       setShowScoreModal(false);
       setSelectedCell(null);
@@ -316,35 +307,31 @@ export default function HoleViewScreen() {
   // Add this function to save scores to Supabase
   const saveScore = async (playerId: string, holeNumber: number, score: number) => {
     console.log('saveScore called with:', { playerId, holeNumber, score });
-    console.log('Current roundId:', roundId);
 
     try {
-      if (!session?.user) {
-        console.error('No user session in saveScore');
-        return;
-      }
-
       if (!roundId) {
         console.error('No active round ID available in saveScore');
         return;
       }
 
-      // Verify the playerId matches the session user
-      if (playerId !== session.user.id) {
-        console.error('Player ID does not match session user');
+      // Find the player's specific round ID from roundPlayers
+      const player = roundPlayers.find(p => p.id === playerId);
+      if (!player) {
+        console.error('Player not found in round group');
         return;
       }
 
       const scoreColumn = `hole_${holeNumber}_score`;
       console.log('Updating score column:', scoreColumn);
       
+      // Use the player's specific roundId instead of the session user's roundId
       const { data, error } = await supabase
         .from('charlie_yates_scorecards')
         .update({
           [scoreColumn]: score,
           updated_at: new Date().toISOString()
         })
-        .eq('id', roundId)
+        .eq('id', player.roundId) // Use player's specific roundId
         .eq('user_id', playerId)
         .select();
 
@@ -444,7 +431,57 @@ export default function HoleViewScreen() {
     fetchHoleData();
   }, [holeNumber]);
 
-  // Add the scoreModal component
+  // Add this function to fetch players in the round group
+  const fetchRoundPlayers = async () => {
+    try {
+      if (!roundId) {
+        console.error('No roundId available');
+        return;
+      }
+
+      // First get the round_group_id for the current round
+      const { data: roundData, error: roundError } = await supabase
+        .from('charlie_yates_scorecards')
+        .select('round_group_id')
+        .eq('id', roundId)
+        .single();
+
+      if (roundError) {
+        console.error('Error fetching round_group_id:', roundError);
+        return;
+      }
+
+      // Then fetch all players in this round group
+      const { data: groupPlayers, error: playersError } = await supabase
+        .from('charlie_yates_scorecards')
+        .select('id, user_id, username')
+        .eq('round_group_id', roundData.round_group_id);
+
+      if (playersError) {
+        console.error('Error fetching players:', playersError);
+        return;
+      }
+
+      setRoundPlayers(groupPlayers.map(player => ({
+        id: player.user_id,
+        username: player.username,
+        roundId: player.id,
+        scores: []
+      })));
+
+    } catch (error) {
+      console.error('Error in fetchRoundPlayers:', error);
+    }
+  };
+
+  // Update the useEffect to fetch players when roundId is available
+  useEffect(() => {
+    if (roundId) {
+      fetchRoundPlayers();
+    }
+  }, [roundId]);
+
+  // Modify the scoreModal to include player selection
   const scoreModal = (
     <Modal
       visible={showScoreModal}
@@ -465,22 +502,49 @@ export default function HoleViewScreen() {
       >
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>
-            {selectedCell ? `Enter score for Hole ${selectedCell.holeNumber}` : 'Select Score'}
+            Enter score for Hole {holeNumber}
           </Text>
-          <View style={styles.scoreButtons}>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
+          
+          {/* Add player selection */}
+          <ScrollView style={styles.playerList}>
+            {roundPlayers.map((player) => (
               <TouchableOpacity
-                key={score}
-                style={styles.scoreButton}
-                onPress={() => {
-                  console.log('Score button pressed:', score);
-                  handleScoreSelect(score);
-                }}
+                key={player.id}
+                style={[
+                  styles.playerItem,
+                  selectedCell?.playerId === player.id && styles.playerItemSelected
+                ]}
+                onPress={() => setSelectedCell({
+                  playerId: player.id,
+                  holeNumber: holeNumber
+                })}
               >
-                <Text style={styles.scoreButtonText}>{score}</Text>
+                <Text style={[
+                  styles.playerName,
+                  selectedCell?.playerId === player.id && styles.playerNameSelected
+                ]}>
+                  {player.username}
+                </Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
+
+          {selectedCell && (
+            <View style={styles.scoreButtons}>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
+                <TouchableOpacity
+                  key={score}
+                  style={styles.scoreButton}
+                  onPress={() => {
+                    console.log('Score button pressed:', score);
+                    handleScoreSelect(score);
+                  }}
+                >
+                  <Text style={styles.scoreButtonText}>{score}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     </Modal>
@@ -992,5 +1056,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     marginTop: 10,
+  },
+  playerList: {
+    maxHeight: 150,
+    marginBottom: 20,
+  },
+  playerItem: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: '#f5f5f5',
+  },
+  playerItemSelected: {
+    backgroundColor: '#007AFF',
+  },
+  playerName: {
+    fontSize: 16,
+    color: '#333',
+  },
+  playerNameSelected: {
+    color: '#fff',
   },
 });
