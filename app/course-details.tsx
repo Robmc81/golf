@@ -6,10 +6,26 @@ import { colors } from './constants/colors';
 import { useCourseDetails, type Course } from './hooks/use-course-details';
 import { useAppStore } from './hooks/use-app-store';
 import { format } from 'date-fns';
+import { supabase } from './lib/supabase';
+import { useSessionContext } from './contexts/SessionContext';
 
 interface CourseParams {
   courseId?: string;
   courseName?: string;
+}
+
+interface RoundData {
+  id: string;
+  total_score: number;
+  date_played: string;
+}
+
+interface DebugInfo {
+  userId?: string;
+  courseId?: string;
+  rounds?: any[];
+  bestRound?: any;
+  error?: string;
 }
 
 export default function CourseDetailsScreen() {
@@ -17,6 +33,11 @@ export default function CourseDetailsScreen() {
   const params = useLocalSearchParams() as CourseParams;
   const { data: course, isLoading, isError } = useCourseDetails(params.courseId);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [courseStats, setCourseStats] = useState<{
+    bestScore: number | null;
+    recentRounds: RoundData[];
+  } | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
   const { 
     isFavoriteCourse, 
     addFavoriteCourse, 
@@ -26,6 +47,9 @@ export default function CourseDetailsScreen() {
     loadRounds,
     rounds
   } = useAppStore();
+  const [session] = useSessionContext();
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<DebugInfo>({});
 
   useEffect(() => {
     const initializeData = async () => {
@@ -53,6 +77,81 @@ export default function CourseDetailsScreen() {
     initializeData();
   }, [course, params.courseId]);
 
+  useEffect(() => {
+    const fetchCourseStats = async () => {
+      if (!session?.user) {
+        console.log('No user session available');
+        setDebugInfo(prev => ({ ...prev, error: 'No user session available' }));
+        setIsLoadingStats(false);
+        return;
+      }
+      
+      try {
+        setIsLoadingStats(true);
+        const userId = session.user.id;
+        const currentDebugInfo: DebugInfo = {
+          userId,
+          courseId: params.courseId
+        };
+        
+        setDebugInfo(currentDebugInfo);
+        
+        console.log('Fetching stats for user ID:', userId);
+
+        // Fetch last 3 completed rounds for the current user, excluding rounds with total_score = 0
+        const { data: rounds, error: roundsError } = await supabase
+          .from('charlie_yates_scorecards')
+          .select('id, total_score, date_played')
+          .eq('user_id', userId)
+          .eq('active', false)  // Changed: look for completed rounds where active = false
+          .neq('total_score', 0)
+          .order('date_played', { ascending: false })
+          .limit(3);
+
+        if (roundsError) {
+          console.error('Error fetching rounds:', roundsError);
+          setDebugInfo(prev => ({ ...prev, error: roundsError.message }));
+          return;
+        }
+
+        console.log('Fetched rounds:', rounds);
+        currentDebugInfo.rounds = rounds;
+
+        // Get the best score (lowest non-zero total_score)
+        const { data: bestRound, error: bestError } = await supabase
+          .from('charlie_yates_scorecards')
+          .select('total_score')
+          .eq('user_id', userId)
+          .eq('active', false)  // Changed: look for completed rounds where active = false
+          .gt('total_score', 0)
+          .order('total_score', { ascending: true })
+          .limit(1)
+          .single();
+
+        if (bestError && bestError.code !== 'PGRST116') {
+          console.error('Error fetching best round:', bestError);
+          setDebugInfo(prev => ({ ...prev, error: bestError.message }));
+        }
+
+        console.log('Best round:', bestRound);
+        currentDebugInfo.bestRound = bestRound;
+        setDebugInfo(currentDebugInfo);
+
+        setCourseStats({
+          bestScore: bestRound?.total_score || null,
+          recentRounds: rounds || []
+        });
+      } catch (error: any) {
+        console.error('Error fetching course stats:', error);
+        setDebugInfo(prev => ({ ...prev, error: error.message }));
+      } finally {
+        setIsLoadingStats(false);
+      }
+    };
+
+    fetchCourseStats();
+  }, [session?.user]);
+
   const toggleFavorite = () => {
     if (!course) return;
     if (isFavoriteCourse(course._id)) {
@@ -63,21 +162,20 @@ export default function CourseDetailsScreen() {
   };
 
   const renderCourseStats = () => {
-    if (!course) {
-      console.log('No course data available');
-      return null;
-    }
-    
-    console.log('Getting stats for course:', course._id);
-    const stats = getCourseStats(course._id);
-    console.log('Course stats:', stats);
-    
-    if (stats.roundsPlayed === 0) {
-      console.log('No rounds played for this course');
+    if (isLoadingStats) {
       return (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Course Stats</Text>
-          <Text style={styles.noStatsText}>You haven't played any rounds at this course yet.</Text>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      );
+    }
+
+    if (!courseStats || courseStats.recentRounds.length === 0) {
+      return (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Course Stats</Text>
+          <Text style={styles.noStatsText}>You haven't played any rounds at Charlie Yates yet.</Text>
         </View>
       );
     }
@@ -85,48 +183,52 @@ export default function CourseDetailsScreen() {
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Course Stats</Text>
-        <View style={styles.statsGrid}>
-          <View style={styles.statGridItem}>
-            <Text style={styles.statGridValue}>{stats.roundsPlayed}</Text>
-            <Text style={styles.statGridLabel}>Rounds Played</Text>
-          </View>
-          <View style={styles.statGridItem}>
-            <Text style={styles.statGridValue}>{stats.averageScore}</Text>
-            <Text style={styles.statGridLabel}>Avg Score</Text>
-          </View>
-          <View style={styles.statGridItem}>
-            <Text style={styles.statGridValue}>{stats.bestScore}</Text>
-            <Text style={styles.statGridLabel}>Best Score</Text>
-          </View>
-        </View>
-
-        {stats.lastRound && (
-          <View style={styles.lastRoundContainer}>
-            <Text style={styles.lastRoundTitle}>Last Round</Text>
-            <View style={styles.lastRoundStats}>
-              <View style={styles.lastRoundStat}>
-                <Text style={styles.lastRoundLabel}>Date</Text>
-                <Text style={styles.lastRoundValue}>
-                  {format(new Date(stats.lastRound.date), 'MMM d, yyyy')}
-                </Text>
-              </View>
-              <View style={styles.lastRoundStat}>
-                <Text style={styles.lastRoundLabel}>Score</Text>
-                <Text style={styles.lastRoundValue}>{stats.lastRound.score}</Text>
-              </View>
-              <View style={styles.lastRoundStat}>
-                <Text style={styles.lastRoundLabel}>vs Par</Text>
-                <Text style={[
-                  styles.lastRoundValue,
-                  { color: stats.lastRound.score > stats.lastRound.par ? colors.error : colors.success }
-                ]}>
-                  {stats.lastRound.score > stats.lastRound.par ? '+' : ''}
-                  {stats.lastRound.score - stats.lastRound.par}
-                </Text>
-              </View>
-            </View>
+        
+        {/* Best Score Section */}
+        {courseStats.bestScore !== null && (
+          <View style={styles.bestScoreContainer}>
+            <Text style={styles.bestScoreLabel}>Best Score</Text>
+            <Text style={styles.bestScoreValue}>{courseStats.bestScore}</Text>
           </View>
         )}
+
+        {/* Recent Rounds Section */}
+        <View style={styles.recentRoundsContainer}>
+          <Text style={styles.recentRoundsTitle}>Recent Rounds</Text>
+          {courseStats.recentRounds.map((round) => (
+            <View key={round.id} style={styles.roundItem}>
+              <Text style={styles.roundDate}>
+                {format(new Date(round.date_played), 'MMM d, yyyy')}
+              </Text>
+              <Text style={styles.roundScore}>{round.total_score}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  const renderDebugOverlay = () => {
+    if (!showDebug) return null;
+
+    return (
+      <View style={styles.debugOverlay}>
+        <ScrollView style={styles.debugContent}>
+          <Text style={styles.debugTitle}>Debug Information</Text>
+          <Text style={styles.debugText}>User ID: {debugInfo.userId || 'Not available'}</Text>
+          <Text style={styles.debugText}>Course ID: {debugInfo.courseId || 'Not available'}</Text>
+          <Text style={styles.debugText}>Recent Rounds: {debugInfo.rounds ? JSON.stringify(debugInfo.rounds, null, 2) : 'No rounds'}</Text>
+          <Text style={styles.debugText}>Best Round: {debugInfo.bestRound ? JSON.stringify(debugInfo.bestRound, null, 2) : 'No best round'}</Text>
+          {debugInfo.error && (
+            <Text style={[styles.debugText, styles.debugError]}>Error: {debugInfo.error}</Text>
+          )}
+        </ScrollView>
+        <TouchableOpacity 
+          style={styles.debugCloseButton}
+          onPress={() => setShowDebug(false)}
+        >
+          <Text style={styles.debugCloseButtonText}>Close Debug</Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -173,6 +275,12 @@ export default function CourseDetailsScreen() {
               color={isFavoriteCourse(course._id) ? colors.primary : "white"} 
             />
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.debugButton} 
+            onPress={() => setShowDebug(true)}
+          >
+            <Text style={styles.debugButtonText}>Debug</Text>
+          </TouchableOpacity>
           <View style={styles.courseNameContainer}>
             <Text style={styles.courseName}>{course.name}</Text>
             <Text style={styles.courseLocation}>{course.location}</Text>
@@ -215,6 +323,7 @@ export default function CourseDetailsScreen() {
           {renderCourseStats()}
         </View>
       </ScrollView>
+      {renderDebugOverlay()}
 
       <View style={styles.actionContainer}>
         <TouchableOpacity 
@@ -441,5 +550,93 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 16,
-  }
+  },
+  bestScoreContainer: {
+    marginBottom: 16,
+  },
+  bestScoreLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  bestScoreValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  recentRoundsContainer: {
+    marginTop: 16,
+  },
+  recentRoundsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  roundItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  roundDate: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  roundScore: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  debugButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    right: 70,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 8,
+    borderRadius: 8,
+    zIndex: 1,
+  },
+  debugButtonText: {
+    color: colors.white,
+    fontSize: 12,
+  },
+  debugOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    zIndex: 999,
+  },
+  debugContent: {
+    padding: 20,
+    flex: 1,
+  },
+  debugTitle: {
+    color: colors.white,
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  debugText: {
+    color: colors.white,
+    fontSize: 14,
+    marginBottom: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  debugError: {
+    color: colors.error,
+  },
+  debugCloseButton: {
+    backgroundColor: colors.primary,
+    padding: 16,
+    alignItems: 'center',
+  },
+  debugCloseButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 }); 
