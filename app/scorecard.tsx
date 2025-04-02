@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './utils/supabaseClient';
 import { Text, View, SafeAreaView, ScrollView, TouchableOpacity, StyleSheet, Modal } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSessionContext } from './contexts/SessionContext';
 
@@ -308,6 +308,8 @@ export default function Scorecard({
 }: Props) {
   const [session] = useSessionContext();
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const isFinishingRound = params.endRound === "true";
   const [isLoading, setIsLoading] = useState(true);
   const [players, setPlayers] = useState<Player[]>([]);
   const [holes, setHoles] = useState<{ number: number; par: number; handicap: number }[]>([]);
@@ -707,10 +709,14 @@ export default function Scorecard({
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="black" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{courseName}</Text>
+        {!isFinishingRound && (
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="black" />
+          </TouchableOpacity>
+        )}
+        <Text style={[styles.headerTitle, isFinishingRound && { marginLeft: 0 }]}>
+          {courseName}
+        </Text>
       </View>
 
       {/* Scorecard Grid */}
@@ -831,15 +837,9 @@ export default function Scorecard({
       {/* Update Finish Round Button */}
       <TouchableOpacity 
         style={styles.finishRoundButton}
-        onPress={async () => {
+        onPress={() => {
           if (roundId) {
-            try {
-              await finishRound(roundId);
-              router.replace(`/round-summary?roundId=${roundId}` as any);
-            } catch (error) {
-              console.error('Failed to finish round:', error);
-              alert('Failed to finish round. Please try again.');
-            }
+            router.replace(`/round-summary?roundId=${roundId}` as any);
           }
         }}
       >

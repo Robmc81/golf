@@ -57,6 +57,26 @@ export default function RoundSummary() {
     }
   };
 
+  const handleReturnHome = async () => {
+    try {
+      if (roundId) {
+        const { error } = await supabase
+          .from('charlie_yates_scorecards')
+          .update({
+            active: false,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', roundId);
+
+        if (error) throw error;
+      }
+      router.replace('/');
+    } catch (error) {
+      console.error('Error updating round status:', error);
+      alert('Failed to update round status. Please try again.');
+    }
+  };
+
   const calculateTotalScore = (data: RoundSummary): number => {
     let total = 0;
     for (let i = 1; i <= 9; i++) {
@@ -77,7 +97,7 @@ export default function RoundSummary() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.replace(`/scorecard?roundId=${roundId}` as any)}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Round Summary</Text>
@@ -124,10 +144,7 @@ export default function RoundSummary() {
 
             <TouchableOpacity 
               style={styles.finishButton}
-              onPress={() => {
-                // Navigate back to home or another appropriate screen
-                router.replace('/');
-              }}
+              onPress={handleReturnHome}
             >
               <Text style={styles.finishButtonText}>Return to Home</Text>
             </TouchableOpacity>
